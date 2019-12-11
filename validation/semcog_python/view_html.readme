@@ -1,0 +1,6 @@
+use "http://htmlpreview.github.io/?" to review Github html files
+ 
+For example:
+http://htmlpreview.github.io/?https://github.com/SEMCOG/SEMCOG_popsim/blob/master/validation/semcog_python/popsim_oakland_BLKGRP__histograms.html
+http://htmlpreview.github.io/?https://github.com/SEMCOG/SEMCOG_popsim/blob/master/validation/semcog_python/synthpop_oakland_BLKGRP__histograms.html
+
