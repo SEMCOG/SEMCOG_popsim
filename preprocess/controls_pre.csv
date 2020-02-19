@@ -1,5 +1,5 @@
 target,geography,seed_table,importance,control_field,expression,acs_variables
-num_hh,BLKGRP,households,1000000000,HHBASE,(households.WGTP > 0) & (households.WGTP < np.inf),B01001_001E
+num_hh,BLKGRP,households,1000000000,HHBASE,(households.WGTP > 0) & (households.WGTP < np.inf),B25002_002E
 hh_age_15_24,BLKGRP,households,500,HHAGE1,(households.AGEHOH <= 24),B25007_003E + B25007_013E
 hh_age_25_44,BLKGRP,households,500,HHAGE2,(households.AGEHOH > 24) & (households.AGEHOH <= 44),B25007_004E + B25007_005E + B25007_014E + B25007_015E
 hh_age_45_64,BLKGRP,households,500,HHAGE3,(households.AGEHOH > 44) & (households.AGEHOH <= 64),B25007_006E + B25007_007E + B25007_008E + B25007_016E + B25007_017E + B25007_018E 
