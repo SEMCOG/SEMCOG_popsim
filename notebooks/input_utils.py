@@ -110,7 +110,7 @@ def preprocess_pums(h_pums, p_pums):
 
     # add HWORKERS to PUMS sample
     p_pums = p_pums.reset_index()
-    h_pums["HWORKERS"] = p_pums.loc[p_pums.ESR.isin(range(1,6))].groupby('SERIALNO').ESR.size()
+    h_pums["HWORKERS"] = p_pums.loc[p_pums.ESR.isin([1,2,4,5])].groupby('SERIALNO').ESR.size()
     h_pums.loc[h_pums.HWORKERS >= 2, "HWORKERS"] = 2
     
     h_pums.fillna(0, inplace = True)
