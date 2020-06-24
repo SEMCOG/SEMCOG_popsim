@@ -15,7 +15,7 @@ from census import Census
 
 
 # %%
-class census_downloader:
+class Census_Downloader:
     def __init__(
         self, census_reader, states, counties=None, tract_ids=None, blockgroup_ids=None
     ):

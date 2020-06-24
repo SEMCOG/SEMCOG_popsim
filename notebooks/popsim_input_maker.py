@@ -3,17 +3,18 @@
 
 
 # %%
-### prepare all inputs needed by populationsim(RSG)
+### prepare all inputs files needed by PopulationSim(RSG)
 ## popsim inputs: geo_crosswalk, Census marginals and PUMS samples
 ## this programs runs with region.yml(as config), and input_utils.py
 ## this programs also needs controls_pre.csv and ACS sample HHs and persons
-
+## > python popsim_input_maker.py key yml
 
 # %%
 import os, re, time
 import pandas as pd
 from census import Census
 import yaml
+from collections import defaultdict
 from input_utils import *
 import argparse
 
@@ -28,13 +29,20 @@ conf = yaml.load(open("./" + args.yml, "r"), Loader=yaml.Loader)
 
 
 # %%
-c = Census(args.key, year=2017).acs5
+acs_year = conf["year"]
+print("synthersizing year ", acs_year)
+
+c = Census(args.key, year=acs_year).acs5  # define dataset
 prj_name = conf["region"]["name"]
 state = conf["region"]["state"][0]
 counties = conf["region"]["counties"]
 pre_folder = conf["preprocess"]["folder"]
-h_pums_csv = "../" + pre_folder + conf["preprocess"]["h_pums_csv"]
-p_pums_csv = "../" + pre_folder + conf["preprocess"]["p_pums_csv"]
+h_pums_csv = (
+    "../" + pre_folder + conf["preprocess"]["h_pums_csv"].format(str(acs_year - 2000))
+)
+p_pums_csv = (
+    "../" + pre_folder + conf["preprocess"]["p_pums_csv"].format(str(acs_year - 2000))
+)
 
 ouptut_geo_cross = "../{}{}_geo_cross_walk.csv".format(pre_folder, prj_name)
 output_control = "../{}{}_control_totals_.csv".format(pre_folder, prj_name)
@@ -50,7 +58,7 @@ print(
         state, counties
     )
 )
-acgeo = ACS5_downloader(
+acgeo = Census_Downloader(
     c, state, counties, "*", "*"
 )  # download Census BGs for this region
 df_geo = pd.DataFrame.from_dict(acgeo.download("NAME")).drop("NAME", axis=1)
@@ -58,14 +66,29 @@ df_geo["tractid"] = df_geo["state"] + df_geo["county"] + df_geo["tract"]
 df_geo["blkgrpid"] = df_geo["tractid"] + df_geo["block group"]
 df_geo.columns = [col.upper() for col in df_geo.columns]
 
-
 # %%
-df_tract_puma = pd.read_csv(conf["geographies"]["tract_puma_file"], dtype=str)
+if acs_year >= 2017:
+
+    df_tract_puma = pd.read_csv(conf["geographies"]["tract_puma_file"], dtype=str)
+    df_tract_puma.rename(columns={"PUMA5CE": "PUMA"}, inplace=True)
+elif (acs_year >= 2010) & (acs_year <= 2016):
+    df_tract_puma = pd.read_csv(
+        "../" + conf["geographies"]["tract_puma0010_file"], dtype=str
+    )
+    df_tract_puma.columns = [col.upper() for col in df_tract_puma.columns]
+    if acs_year >= 2012:
+        df_tract_puma.fillna("00000", inplace=True)
+        df_tract_puma["PUMA"] = df_tract_puma["PUMA00_ID"] + df_tract_puma["PUMA10_ID"]
+    else:
+        df_tract_puma.rename(columns={"PUMA00_ID": "PUMA"}, inplace=True)
+else:
+    print("synthesis year should be 2010 or later")
+    exit()
+
 df_tract_puma = df_tract_puma.loc[df_tract_puma.STATEFP == acgeo.states]
 df_tract_puma["TRACTID"] = (
     df_tract_puma["STATEFP"] + df_tract_puma["COUNTYFP"] + df_tract_puma["TRACTCE"]
 )
-df_tract_puma.rename(columns={"PUMA5CE": "PUMA"}, inplace=True)
 
 
 # %%
@@ -94,10 +117,10 @@ for geo, dfgeo in dfc.groupby("geography"):
         )
     )
     if geo == "BLKGRP":
-        ac5 = ACS5_downloader(c, state, counties, "*", "*")
+        ac5 = Census_Downloader(c, state, counties, "*", "*")
         geo_cols = ["state", "county", "tract", "block group"]
     elif geo == "TRACT":
-        ac5 = ACS5_downloader(c, state, counties, "*")
+        ac5 = Census_Downloader(c, state, counties, "*")
         geo_cols = ["state", "county", "tract"]
     print("\t" + geo + " marginals ")
     dic_margs[geo] = ac5.download(full_vars).set_index(geo_cols)
@@ -149,29 +172,58 @@ for geo, dfm in dic_margs.items():
 print("\nExtrating PUMS seed households and persons")
 
 # %%
-puma_lst = df_tract_puma.loc[
-    (df_tract_puma.STATEFP == acgeo.states)
-    & (df_tract_puma.COUNTYFP.isin(acgeo.counties.split(",")))
-].PUMA.unique()
-
+# puma_lst = df_tract_puma.loc[
+#     (df_tract_puma.STATEFP == acgeo.states)
+#     & (df_tract_puma.COUNTYFP.isin(acgeo.counties.split(",")))
+# ].PUMA.unique()
+puma_lst = df_geo_cross.PUMA.unique()
 
 # %%
 h_pums = pd.read_csv(h_pums_csv, index_col="SERIALNO")
-h_pums = h_pums.loc[h_pums.PUMA.isin(puma_lst)]
+p_pums = pd.read_csv(p_pums_csv)
+emp_df = pd.DataFrame()
+h_samples, p_samples = [], []
+
+
+if (acs_year <= 2011) or (acs_year >= 2017):
+    h_pums = h_pums.loc[h_pums.PUMA.isin(puma_lst)]
+    p_pums = p_pums.loc[p_pums.PUMA.isin(puma_lst)]
+else:
+    pums_grp = {}
+    for pma in ["PUMA00", "PUMA10"]:
+        pums_grp[pma] = defaultdict(dict)
+        for indx, grp in h_pums.loc[h_pums[pma] != -9].groupby(pma):
+            pums_grp[pma]["households"][indx] = grp
+        for indx, grp in p_pums.loc[p_pums[pma] != -9].groupby(pma):
+            pums_grp[pma]["persons"][indx] = grp
+        pums_grp[pma]["households"][0] = emp_df
+        pums_grp[pma]["persons"][0] = emp_df
+
+    for puma in puma_lst:
+        h_puma = pd.concat(
+            [
+                pums_grp["PUMA00"]["households"][int(puma[:5])],
+                pums_grp["PUMA10"]["households"][int(puma[5:])],
+            ]
+        )
+        h_puma["PUMA"] = puma
+        h_samples.append(h_puma)
+        p_puma = pd.concat(
+            [
+                pums_grp["PUMA00"]["persons"][int(puma[:5])],
+                pums_grp["PUMA10"]["persons"][int(puma[5:])],
+            ]
+        )
+        p_puma["PUMA"] = puma
+        p_samples.append(p_puma)
+
+    h_pums = pd.concat(h_samples)
+    p_pums = pd.concat(p_samples)
+
 h_pums = h_pums.loc[
     (h_pums.TYPE == 1) & (h_pums.NP > 0)
 ]  # remove group quarters and empty units
-
-p_pums = pd.read_csv(p_pums_csv)
-p_pums = p_pums.loc[p_pums.PUMA.isin(puma_lst)]
 p_pums = p_pums.loc[p_pums["SERIALNO"].isin(h_pums.index)]
-
-
-# %%
-h_pums, p_pums = preprocess_pums(h_pums, p_pums)
-
-h_pums["hh_id"] = h_pums.index.values
-p_pums["hh_id"] = p_pums.SERIALNO
 
 print(
     "  saving seed households: {}   . {} records".format(
