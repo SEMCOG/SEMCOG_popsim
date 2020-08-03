@@ -1,4 +1,9 @@
 year: 2015
+
+config: "./config/settings.yaml"
+
+data_folder: "data"
+
 region:
   name: SEMCOG
   state: ["MI"]
@@ -16,11 +21,12 @@ region:
 geographies:
   fips_file: "https://www2.census.gov/geo/docs/reference/codes/files/national_county.txt"
   tract_puma_file: "https://www2.census.gov/geo/docs/maps-data/data/rel/2010_Census_Tract_to_2010_PUMA.txt"
-  tract_puma0010_file: "preprocess/tract10_to_puma.csv" #tract10 to PUMA00 and PUMA10 crosswalk, from UrbanSim
+  tract_puma0010_file: "tract0010_to_puma.csv" #tract10 to PUMA00 and PUMA10 crosswalk, from UrbanSim
   # https://s3-us-west-1.amazonaws.com/synthpop-data2/tract10_to_puma.csv
 
 preprocess:
   folder: "preprocess/"
+  settings_file: "semcog_res_settings.yaml"
   pre_control: "controls_pre.csv"
   h_pums_csv: "ACS/ss{}hmi.csv"
   p_pums_csv: "ACS/ss{}pmi.csv"
