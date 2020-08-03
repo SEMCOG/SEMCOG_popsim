@@ -37,7 +37,7 @@ Input structure:
 #### Results and visualization
  * output folder has synthetic HHs, persons and one or more summary_<geo>.csv files
  * output_stats_plots.ipynb could be used to generate [error plot]
-(https://raw.githubusercontent.com/SEMCOG/SEMCOG_popsim/master/validation/semcog_python/synpop_popsim_error_plot.png) and [histograms]
+(https://raw.githubusercontent.com/SEMCOG/SEMCOG_popsim/master/validation/semcog_python/synpop_popsim_error_plot.png) and [histograms](https://github.com/SEMCOG/SEMCOG_popsim/blob/master/validation/semcog_python/popsim_oakland_BLKGRP__histograms.html). 
 
 ---
 ### 2. Forecast Refinement
