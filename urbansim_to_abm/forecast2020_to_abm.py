@@ -29,6 +29,7 @@ from datetime import date
 import random
 import concurrent.futures as conc
 from itertools import repeat
+import psutil
 
 random.seed(1)
 
@@ -36,7 +37,7 @@ random.seed(1)
 def find_matching_index(df1, df2, keycols):
 
     rstart, rend = df1.index[0], df1.index[-1]
-    print(f"process records {rstart} -- {rend}")
+    print(f"\nprocess records {rstart} -- {rend}")
 
     v1, v2 = df1.index.name, df2.index.name
     df1 = df1.reset_index().set_index([v1] + keycols).sort_index()
@@ -80,10 +81,11 @@ def concur_match(df1, df2, keycols):
     assert (type(v1) == str) & (type(v2) == str) == True
     print(f"matching indices:  df1|{v1}  --  df|{v2}")
 
-    csize = len(df1)//8 + 1 #8 is the # of cores
+    ncore = psutil.cpu_count()
+    csize = len(df1)//ncore + 1 #8 is the # of cores
     while csize > 100_000:  #arbitrary size
         csize = csize//2 + 1
-    print('chunk size:', csize)
+    print(f'running concurrent using {ncore} cpu cores, chunk size:', csize)
     list_df = [df1[i : i + csize] for i in range(0, df1.shape[0], csize)]
 
     with conc.ProcessPoolExecutor() as executor:
