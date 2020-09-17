@@ -188,8 +188,8 @@ print("\nExtrating PUMS seed households and persons")
 puma_lst = df_geo_cross.PUMA.unique()
 
 # %%
-h_pums = pd.read_csv(h_pums_csv, index_col="SERIALNO")
-p_pums = pd.read_csv(p_pums_csv)
+h_pums = pd.read_csv(h_pums_csv, index_col="SERIALNO", dtype={"SERIALNO": str})
+p_pums = pd.read_csv(p_pums_csv, dtype={"SERIALNO": str})
 emp_df = pd.DataFrame()
 h_samples, p_samples = [], []
 count = 0
@@ -239,8 +239,11 @@ p_pums = p_pums.loc[p_pums["SERIALNO"].isin(h_pums.index)]
 
 h_pums, p_pums = preprocess_pums(h_pums, p_pums)
 
-h_pums["hh_id"] = h_pums.index.values
-p_pums["hh_id"] = p_pums.SERIALNO
+# h_pums["hh_id"] = h_pums.index.values
+h_pums["hh_id"] = range(len(h_pums))
+p_pums = pd.merge(
+    p_pums, h_pums[["hh_id"]], left_on="SERIALNO", right_index=True, how="left"
+)
 
 print(
     "  saving seed households: {}   . {} records".format(
