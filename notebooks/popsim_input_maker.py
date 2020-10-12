@@ -188,7 +188,8 @@ print("\nExtrating PUMS seed households and persons")
 puma_lst = df_geo_cross.PUMA.unique()
 
 # %%
-h_pums = pd.read_csv(h_pums_csv, index_col="SERIALNO", dtype={"SERIALNO": str})
+h_pums = pd.read_csv(h_pums_csv, dtype={"SERIALNO": str})
+h_pums = h_pums.set_index("SERIALNO")  # keep index as string, one-line doesn't work
 p_pums = pd.read_csv(p_pums_csv, dtype={"SERIALNO": str})
 emp_df = pd.DataFrame()
 h_samples, p_samples = [], []
@@ -217,7 +218,7 @@ else:
             ]
         )
         h_puma["PUMA"] = puma
-        h_puma.index = count * (10 ** 13) + h_puma.index
+        h_puma.index = str(count) + h_puma.index
         h_samples.append(h_puma)
         p_puma = pd.concat(
             [
@@ -226,7 +227,7 @@ else:
             ]
         )
         p_puma["PUMA"] = puma
-        p_puma["SERIALNO"] = count * (10 ** 13) + p_puma["SERIALNO"]
+        p_puma["SERIALNO"] = str(count) + p_puma["SERIALNO"]
         p_samples.append(p_puma)
 
     h_pums = pd.concat(h_samples)
@@ -354,4 +355,3 @@ print(
     "\nDone. All files are saved to " + output_folder,
     '\nTo run Populationsim, copy new settings and controls to configs folder and rename "xxx_settings.yaml" to "settings.yaml"',
 )
-
