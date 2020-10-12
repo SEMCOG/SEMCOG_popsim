@@ -141,4 +141,40 @@ def preprocess_pums(h_pums, p_pums):
     # for v in ["AGEHOH","HRACE", "HHISP","HWORKERS" ]:
     #    print (v, h_pums.groupby(v).size())
 
+    # recode NAICSP to industry
+    dict_naics2ind = {
+        "11": 1,
+        "21": 1,
+        "23": 2,
+        "31": 3,
+        "32": 3,
+        "33": 3,
+        "3M": 3,
+        "42": 4,
+        "44": 5,
+        "45": 5,
+        "4M": 5,
+        "48": 6,
+        "49": 6,
+        "22": 6,
+        "51": 7,
+        "52": 8,
+        "53": 8,
+        "54": 9,
+        "55": 9,
+        "56": 9,
+        "61": 10,
+        "62": 10,
+        "71": 11,
+        "72": 11,
+        "81": 12,
+        "92": 13,
+        "99": 0,
+    }
+    p_pums["industry"] = p_pums.NAICSP.str[:2]
+    p_pums.industry.replace(dict_naics2ind, inplace=True)
+    p_pums.loc[p_pums.NAICSP.str[:6] == "928110", "industry"] = 14
+    p_pums.loc[p_pums.NAICSP.isnull(), "industry"] = 0
+    p_pums.industry = p_pums.industry.astype(int)
+
     return h_pums, p_pums
