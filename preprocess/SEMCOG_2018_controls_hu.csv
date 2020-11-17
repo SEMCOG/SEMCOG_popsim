@@ -1,0 +1,28 @@
+target,geography,seed_table,importance,control_field,expression,acs_variables
+num_hh,BLKGRP,households,1000000000,HHBASE,(households.WGTP > 0) & (households.WGTP < np.inf),B25001_001E
+hu_vac,BLKGRP,households,10000,HUVAC,(households.NP == 0),B25002_003E
+hu_occup,BLKGRP,households,10000,HUOCCUP,(households.NP > 0),B25002_002E
+hu_own_sf_2010,TRACT,households,500,HUOWNSF2010,"(households.TEN.isin([1,2])) & (households.BLD.isin([2,3])) & (households.YBL >= 14)",B25127_004E
+hu_own_mf2_2010,TRACT,households,500,HUOWNMFA2010,"(households.TEN.isin([1,2])) & (households.BLD.isin([4,5])) & (households.YBL >= 14)",B25127_005E
+hu_own_mf5_2010,TRACT,households,500,HUOWNMFB2010,"(households.TEN.isin([1,2])) & (households.BLD >= 6) & (households.YBL >= 14)",B25127_006E + B25127_007E  + B25127_008E 
+hu_own_mobile_2010,TRACT,households,500,HUOWNMOB2010,"(households.TEN.isin([1,2])) & (households.BLD == 1) & (households.YBL >= 14)",B25127_009E
+hu_own_sf_2000,TRACT,households,500,HUOWNSF2000,"(households.TEN.isin([1,2])) & (households.BLD.isin([2,3])) & (households.YBL >= 8) & (households.YBL <= 13)",B25127_011E
+hu_own_mf2_2000,TRACT,households,500,HUOWNMFA2000,"(households.TEN.isin([1,2])) & (households.BLD.isin([4,5])) & (households.YBL >= 8) & (households.YBL <= 13)",B25127_012E
+hu_own_mf5_2000,TRACT,households,500,HUOWNMFB2000,"(households.TEN.isin([1,2])) & (households.BLD >= 6) & (households.YBL >= 8) & (households.YBL <= 13)",B25127_013E + B25127_015E + B25127_015E 
+hu_own_mobile_2000,TRACT,households,500,HUOWNMOB2000,"(households.TEN.isin([1,2])) & (households.BLD == 1) & (households.YBL >= 8) & (households.YBL <= 13)",B25127_016E
+hu_own_sf_1900,TRACT,households,500,HUOWNSF1900,"(households.TEN.isin([1,2])) & (households.BLD.isin([2,3])) & (households.YBL < 8)",B25127_018E + B25127_025E + B25127_032E + B25127_039E
+hu_own_mf2_1900,TRACT,households,500,HUOWNMFA1900,"(households.TEN.isin([1,2])) & (households.BLD.isin([4,5])) &  (households.YBL < 8)",B25127_019E + B25127_026E + B25127_033E + B25127_040E
+hu_own_mf5_1900,TRACT,households,500,HUOWNMFB1900,"(households.TEN.isin([1,2])) & (households.BLD >= 6) &  (households.YBL < 8)",B25127_020E + B25127_021E + B25127_022E + B25127_027E + B25127_028E + B25127_029E + B25127_034E + B25127_035E + B25127_036E + B25127_041E + B25127_042E + B25127_043E
+hu_own_mobile_1900,TRACT,households,500,HUOWNMOB1900,"(households.TEN.isin([1,2])) & (households.BLD == 1) &  (households.YBL < 8)",B25127_023E + B25127_030E + B25127_037E + B25127_044E
+hu_rent_sf_2010,TRACT,households,500,HURENTSF2010,"(households.TEN.isin([3,4])) & (households.BLD.isin([2,3])) & (households.YBL >= 14)",B25127_047E
+hu_rent_mf2_2010,TRACT,households,500,HURENTMFA2010,"(households.TEN.isin([3,4])) & (households.BLD.isin([4,5])) & (households.YBL >= 14)",B25127_048E
+hu_rent_mf5_2010,TRACT,households,500,HURENTMFB2010,"(households.TEN.isin([3,4])) & (households.BLD >= 6) & (households.YBL >= 14)",B25127_049E + B25127_050E + B25127_051E
+hu_rent_mobile_2010,TRACT,households,500,HURENTMOB2010,"(households.TEN.isin([3,4])) & (households.BLD == 1) & (households.YBL >= 14)",B25127_052E
+hu_rent_sf_2000,TRACT,households,500,HURENTSF2000,"(households.TEN.isin([3,4])) & (households.BLD.isin([2,3])) & (households.YBL >= 8) & (households.YBL <= 13)",B25127_054E
+hu_rent_mf2_2000,TRACT,households,500,HURENTMFA2000,"(households.TEN.isin([3,4])) & (households.BLD.isin([4,5])) & (households.YBL >= 8) & (households.YBL <= 13)",B25127_055E
+hu_rent_mf5_2000,TRACT,households,500,HURENTMFB2000,"(households.TEN.isin([3,4])) & (households.BLD >= 6) & (households.YBL >= 8) & (households.YBL <= 13)",B25127_056E + B25127_057E + B25127_058E
+hu_rent_mobile_2000,TRACT,households,500,HURENTMOB2000,"(households.TEN.isin([3,4])) & (households.BLD == 1) & (households.YBL >= 8) & (households.YBL <= 13)",B25127_059E
+hu_rent_sf_1900,TRACT,households,500,HURENTSF1900,"(households.TEN.isin([3,4])) & (households.BLD.isin([2,3])) & (households.YBL < 8)",B25127_061E + B25127_068E + B25127_075E + B25127_082E
+hu_rent_mf2_1900,TRACT,households,500,HURENTMFA1900,"(households.TEN.isin([3,4])) & (households.BLD.isin([4,5])) &  (households.YBL < 8)",B25127_062E + B25127_069E + B25127_076E + B25127_083E
+hu_rent_mf5_1900,TRACT,households,500,HURENTMFB1900,"(households.TEN.isin([3,4])) & (households.BLD >= 6) &  (households.YBL < 8)",B25127_063E + B25127_064E + B25127_065E + B25127_070E + B25127_071E + B25127_072E + B25127_077E + B25127_078E + B25127_079E + B25127_084E + B25127_085E + B25127_086E
+hu_rent_mobile_1900,TRACT,households,500,HURENTMOB1900,"(households.TEN.isin([3,4])) & (households.BLD == 1) &  (households.YBL < 8)",B25127_066E + B25127_080E + B25127_087E
