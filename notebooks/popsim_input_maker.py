@@ -35,8 +35,9 @@ conf = yaml.load(open("./" + args.yaml, "r"), Loader=yaml.Loader)
 
 
 # %%
+target = conf["target"]
 acs_year = conf["year"]
-print("\nsynthersizing population for year ", acs_year)
+print("\n *** synthersizing {} for year {} ***".format(target, acs_year))
 
 c = Census(args.key, year=acs_year).acs5  # define dataset
 prj_name = conf["region"]["name"]
@@ -233,9 +234,10 @@ else:
     h_pums = pd.concat(h_samples)
     p_pums = pd.concat(p_samples)
 
-h_pums = h_pums.loc[
-    (h_pums.TYPE == 1) & (h_pums.NP > 0)
-]  # remove group quarters and empty units
+if target != "housing_units":
+    h_pums = h_pums.loc[
+        (h_pums.TYPE == 1) & (h_pums.NP > 0)
+    ]  # remove group quarters and empty units
 p_pums = p_pums.loc[p_pums["SERIALNO"].isin(h_pums.index)]
 
 h_pums, p_pums = preprocess_pums(h_pums, p_pums)
