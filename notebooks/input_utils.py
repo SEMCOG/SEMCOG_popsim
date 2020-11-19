@@ -121,16 +121,42 @@ def preprocess_pums(h_pums, p_pums):
     h_pums["AGEHOH"] = p_pums.loc[p_pums.RELP == 0].AGEP
 
     # add HRACE to PUMS sample
+    # RAC1P Character 1
+    # Recoded detailed race code
+    # 1 .White alone
+    # 2 .Black or African American alone
+    # 3 .American Indian alone
+    # 4 .Alaska Native alone
+    # 5 .American Indian and Alaska Native tribes specified; or
+    # .American Indian or Alaska Native, not specified and no other
+    # .races
+    # 6 .Asian alone
+    # 7 .Native Hawaiian and Other Pacific Islander alone
+    # 8 .Some Other Race alone
+    # 9 .Two or More Races
     rac_map = {1: 1, 2: 2, 6: 3}
     h_pums["HRACE"] = p_pums.loc[p_pums.RELP == 0].RAC1P
     h_pums["HRACE"] = h_pums["HRACE"].map(rac_map).fillna(4)
 
     # add HHISP to PUMS sample
+    # HISP Character 2
+    # Recoded detailed Hispanic origin
+    # 01 .Not Spanish/Hispanic/Latino
+    # 02 - 24, hisp
     hisp_map = {1: 0}
     h_pums["HHISP"] = p_pums.loc[p_pums.RELP == 0].HISP
     h_pums["HHISP"] = h_pums["HHISP"].map(hisp_map).fillna(1)
 
     # add HWORKERS to PUMS sample
+    # ESR Character 1
+    # Employment status recode
+    # b .N/A (less than 16 years old)
+    # 1 .Civilian employed, at work
+    # 2 .Civilian employed, with a job but not at work
+    # 3 .Unemployed
+    # 4 .Armed forces, at work
+    # 5 .Armed forces, with a job but not at work
+    # 6 .Not in labor force
     p_pums = p_pums.reset_index()
     h_pums["HWORKERS"] = (
         p_pums.loc[p_pums.ESR.isin([1, 2, 4, 5])].groupby("SERIALNO").ESR.size()
@@ -142,6 +168,7 @@ def preprocess_pums(h_pums, p_pums):
     #    print (v, h_pums.groupby(v).size())
 
     # recode NAICSP to industry
+    # https://www2.census.gov/programs-surveys/acs/tech_docs/code_lists/2018_ACS_Code_Lists.pdf
     dict_naics2ind = {
         "11": 1,
         "21": 1,
