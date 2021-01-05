@@ -169,6 +169,7 @@ def preprocess_pums(h_pums, p_pums):
 
     # recode NAICSP to industry
     # https://www2.census.gov/programs-surveys/acs/tech_docs/code_lists/2018_ACS_Code_Lists.pdf
+    # summary table example https://www.socialexplorer.com/data/ACS2017_5yr/metadata/?ds=ACS17_5yr&table=B08126
     dict_naics2ind = {
         "11": 1,
         "21": 1,
