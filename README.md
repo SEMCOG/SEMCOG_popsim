@@ -75,7 +75,4 @@ Similar inputs to population synthesis are expected
 4. control_totals: summarized from official SEMCOG forecast, or use reviewed indicators;
 5. seed_households: use model output households, add weight and geographies
 6. see_persons: use model output persons, add weight and geographies
-   
----
-## 3. ABM test inputs
-This package also contains the work to develop [test demographic inputs](https://github.com/SEMCOG/SEMCOG_popsim/tree/master/urbansim_to_abm) for SEMCOG ABM model. 
+
