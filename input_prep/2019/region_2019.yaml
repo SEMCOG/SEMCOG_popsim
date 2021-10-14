@@ -1,0 +1,61 @@
+#all input configurations and data files now stored under "input_prep/{year}"
+#input_prep/region_[year].yaml
+#input_prep/settings_[year].yaml
+#input_prep/controls_pre_[year].csv
+project:
+  name: SEMCOG
+  target: "households"
+  acs_year: 2019
+  acs_sample: acs5
+  settings: "settings_{}.yaml"
+  pre_control: "controls_pre_{}.csv"
+  h_pums_csv: "PUMS/ss19hmi.csv"
+  p_pums_csv: "PUMS/ss19pmi.csv"
+
+geography:
+  name: SEMCOG
+  state: ["MI"]
+  counties:
+    [
+      "Oakland County",
+      "Washtenaw County",
+      "St. Clair County",
+      "Livingston County",
+      "Wayne County",
+      "Macomb County",
+      "Monroe County",
+    ]
+  fips_file: "https://www2.census.gov/geo/docs/reference/codes/files/national_county.txt"
+  #tract_puma_file: "https://www2.census.gov/geo/docs/maps-data/data/rel/2010_Census_Tract_to_2010_PUMA.txt"
+  tract_puma_file: "geo/2010_Census_Tract_to_2010_PUMA.txt"
+  tract_puma0010_file: "geo/tract0010_to_puma.csv" #tract10 to PUMA00 and PUMA10 crosswalk, from UrbanSim
+  # https://s3-us-west-1.amazonaws.com/synthpop-data2/tract10_to_puma.csv
+# PUMS data preparation. for example:
+# 2017 ACS 5-year HHs;    https://www2.census.gov/programs-surveys/acs/data/pums/2017/5-Year/csv_hmi.zip
+# 2017 ACS 5-year Persons;    https://www2.census.gov/programs-surveys/acs/data/pums/2017/5-Year/csv_pmi.zip
+# downloaded files and save to "preprocess/ACS"
+
+census_updates:
+  2019:
+    RELSHIPP:
+      std_variable: RELP
+      std_codes:
+        20: 0
+        21: 1
+        22: 13
+        23: 1
+        24: 13
+        25: 2
+        26: 3
+        27: 4
+        28: 5
+        29: 6
+        30: 7
+        31: 8
+        32: 9
+        33: 10
+        34: 12
+        35: 14
+        36: 15
+        37: 16
+        38: 17

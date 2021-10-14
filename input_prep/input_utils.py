@@ -4,7 +4,7 @@
 from IPython import get_ipython
 
 # %%
-### generate control totals needed by populationsim(RSG)
+# generate control totals needed by populationsim(RSG)
 
 
 # %%
@@ -114,7 +114,7 @@ class Census_Downloader:
 
 
 def preprocess_pums(h_pums, p_pums):
-    ### h_pums and p_pums must have the same index column 'SERIALNO'
+    # h_pums and p_pums must have the same index column 'SERIALNO'
     p_pums = p_pums.set_index("SERIALNO")
 
     # add AGEHOH to PUMS sample
@@ -161,7 +161,6 @@ def preprocess_pums(h_pums, p_pums):
     h_pums["HWORKERS"] = (
         p_pums.loc[p_pums.ESR.isin([1, 2, 4, 5])].groupby("SERIALNO").ESR.size()
     )
-    h_pums.loc[h_pums.HWORKERS >= 2, "HWORKERS"] = 2
 
     h_pums.fillna(0, inplace=True)
     # for v in ["AGEHOH","HRACE", "HHISP","HWORKERS" ]:
@@ -206,3 +205,33 @@ def preprocess_pums(h_pums, p_pums):
     p_pums.industry = p_pums.industry.astype(int)
 
     return h_pums, p_pums
+
+
+def acs_update(df, dic_var):
+    for k in dic_var.keys():
+        if k in df.columns:
+            conv = dic_var[k]
+            df[conv['std_variable']] = df[k]
+            df[conv['std_variable']].replace(conv['std_codes'], inplace=True)
+
+    return df
+
+
+# def control_summary(df_controls, df_margins):
+#     for _, dft in df_controls[['geography', 'attr', 'control_field']].groupby('geography'):
+#         dft = dft[['attr', 'control_field']].groupby('attr').agg(list)
+#         att_dict = dft.to_dict()
+#     for k in att_dict.keys():
+#         print(k, df_margins[att_dict[k]].sum().sum())
+
+
+def marginal_summary(df_margin):
+    print('* verify maringal sums:')
+    at_lst = []
+    for col in df_margin.columns:
+        c = ''.join(i for i in col if not i.isdigit())
+        if 'ID' not in c:
+            at_lst.append(c)
+    for at in sorted(set(at_lst)):
+        cols = [c for c in df_margin.columns if c.startswith(at)]
+        print(at, df_margin[cols].sum().sum(), cols)

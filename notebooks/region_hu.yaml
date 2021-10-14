@@ -1,3 +1,4 @@
+target: "housing_units"
 year: 2013
 config: "./config/settings.yaml"
 
@@ -26,8 +27,8 @@ geographies:
 
 preprocess:
   folder: "preprocess/"
-  settings_file: "semcog_res_settings.yaml"
-  pre_control: "controls_pre_tenind.csv"
+  settings_file: "SEMCOG_2018_settings_hu.yaml"
+  pre_control: "SEMCOG_2018_controls_hu.csv"
   h_pums_csv: "ACS/ss{}hmi.csv"
   p_pums_csv: "ACS/ss{}pmi.csv"
 # PUMS data preparation. for example:
