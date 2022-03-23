@@ -146,6 +146,7 @@ def preprocess_pums(h_pums, p_pums):
     h_pums["HHISP"] = p_pums.loc[p_pums.RELP == 0].HISP
     h_pums["HHISP"] = h_pums["HHISP"].map(hisp_map).fillna(1)
 
+ 
     # adjust hh income to current ACS year (release year)
     h_pums['income'] = (h_pums.HINCP * h_pums.ADJINC / 1000000).astype(int)
 
@@ -205,7 +206,7 @@ def preprocess_pums(h_pums, p_pums):
     p_pums.loc[p_pums.NAICSP.str[:6] == "928110", "industry"] = 14
     p_pums.loc[p_pums.NAICSP.isnull(), "industry"] = 0
     p_pums.industry = p_pums.industry.astype(int)
-
+ 
     # adjust person income to current ACS year (release year)
     p_pums['pincome'] = p_pums['PINCP'] * p_pums['ADJINC'] / 1000000
     p_pums['pincome'] = p_pums.loc[~p_pums['pincome'].isnull(), 'pincome'].astype(int)
