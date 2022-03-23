@@ -65,7 +65,7 @@ def update_hhsize_control(df_ctrl, df_output):
 if __name__ == "__main__":
 
     ctrl_file = 'data/SEMCOG_2019_control_totals_blkgrp.csv'
-    output_file = 'output/final_summary_BLKGRP.csv'
+    output_file = 'output/run6_pass1/final_summary_BLKGRP.csv'
 
     df_ctrl = pd.read_csv(ctrl_file, index_col='BLKGRPID')
     df_output = pd.read_csv(output_file, index_col='id')
@@ -73,13 +73,21 @@ if __name__ == "__main__":
     df_new_target, ctrl_cols = update_hhsize_control(df_ctrl, df_output)
     df_ctrl[ctrl_cols] = df_new_target[ctrl_cols]
 
-    # back up control file
+    # back up control file from previous run, change its name to xxx_run##.csv
     i = 0
     ctrl_backup = ctrl_file.replace('.csv', '_run%s.csv')
     while os.path.exists(ctrl_backup % i):
         i += 1
     os.rename(ctrl_file, ctrl_backup % i)
 
+
+    # save 2 copies of new control files, one has original name, the other as a backup "hhsize_adj"
     df_ctrl.to_csv(ctrl_file)
     df_ctrl.to_csv(ctrl_backup.replace('.csv', '_hhsize_adj.csv') % i)
 
+    print(f'original control file {ctrl_file} has been renamed to ', ctrl_backup % i)
+    print(f'new control file "{ctrl_file}" were produced and replaced the original control')
+   
+
+
+# %%
