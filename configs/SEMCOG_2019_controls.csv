@@ -12,10 +12,10 @@ hh_hisp_not,BLKGRP,households,500,HHHISP1,(households.HHISP == 0),B11005_001E - 
 hh_hisp,BLKGRP,households,500,HHHISP2,(households.HHISP == 1),B25003I_001E
 hh_children,BLKGRP,households,5000,HHCHD1,(households.R18 == 1),B11005_002E
 hh_children_not,BLKGRP,households,5000,HHCHD2,(households.R18 != 1),B11005_011E
-hh_inc_30,BLKGRP,households,500,HHINC1,(households.HINCP > -999999999) & (households.HINCP <= 30000),B19001_002E + B19001_003E + B19001_004E + B19001_005E + B19001_006E
-hh_inc_30_60,BLKGRP,households,500,HHINC2,(households.HINCP >30000) & (households.HINCP <= 60000),B19001_007E + B19001_008E + B19001_009E + B19001_010E + B19001_011E
-hh_inc_60_100,BLKGRP,households,500,HHINC3,(households.HINCP > 60000) & (households.HINCP <= 100000),B19001_012E + B19001_013E
-hh_inc_100_plus,BLKGRP,households,500,HHINC4,(households.HINCP > 100000),B19001_014E + B19001_015E + B19001_016E + B19001_017E
+hh_inc_30,BLKGRP,households,500,HHINC1,(households.income > -999999999) & (households.income <= 30000),B19001_002E + B19001_003E + B19001_004E + B19001_005E + B19001_006E
+hh_inc_30_60,BLKGRP,households,500,HHINC2,(households.income >30000) & (households.income <= 60000),B19001_007E + B19001_008E + B19001_009E + B19001_010E + B19001_011E
+hh_inc_60_100,BLKGRP,households,500,HHINC3,(households.income > 60000) & (households.income <= 100000),B19001_012E + B19001_013E
+hh_inc_100_plus,BLKGRP,households,500,HHINC4,(households.income > 100000),B19001_014E + B19001_015E + B19001_016E + B19001_017E
 hh_cars_0,BLKGRP,households,500,HHCAR0,(households.VEH == 0),B25044_003E + B25044_010E
 hh_cars_1,BLKGRP,households,500,HHCAR1,(households.VEH == 1),B25044_004E + B25044_011E
 hh_cars_2,BLKGRP,households,500,HHCAR2,(households.VEH >= 2),B25044_005E + B25044_006E + B25044_007E + B25044_008E + B25044_012E + B25044_013E + B25044_014E + B25044_015E
