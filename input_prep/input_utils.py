@@ -214,12 +214,13 @@ def preprocess_pums(h_pums, p_pums):
     return h_pums, p_pums
 
 
-def acs_update(df, dic_var):
+def pums_update(df, dic_var):
     for k in dic_var.keys():
         if k in df.columns:
             conv = dic_var[k]
             df[conv['std_variable']] = df[k]
-            df[conv['std_variable']].replace(conv['std_codes'], inplace=True)
+            if 'std_codes' in conv:
+                df[conv['std_variable']].replace(conv['std_codes'], inplace=True)
 
     return df
 

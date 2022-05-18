@@ -13,33 +13,33 @@ seed_geography: PUMA
 trace_geography:
   BLKGRP: 261251620002
   TRACT: 26125162000
-data_dir: data/2019
+data_dir: data/2020
 input_table_list:
 - tablename: households
-  filename: SEMCOG_2019_seed_households.csv
+  filename: SEMCOG_2020_seed_households.csv
   index_col: hh_id
   column_map:
     hhnum: hh_id
 - tablename: persons
-  filename: SEMCOG_2019_seed_persons.csv
+  filename: SEMCOG_2020_seed_persons.csv
   column_map:
     hhnum: hh_id
     SPORDER: per_num
   drop_columns: null
 - tablename: geo_cross_walk
-  filename: SEMCOG_2019_geo_cross_walk.csv
+  filename: SEMCOG_2020_geo_cross_walk.csv
   column_map:
     BLKGRPID: BLKGRP
     TRACTID: TRACT
     PUMAID: PUMA
 - tablename: BLKGRP_control_data
-  filename: SEMCOG_2019_control_totals_blkgrp.csv
+  filename: SEMCOG_2020_control_totals_blkgrp.csv
   column_map:
     BLKGRPID: BLKGRP
     TRACTID: TRACT
     PUMAID: PUMA
 - tablename: TRACT_control_data
-  filename: SEMCOG_2019_control_totals_tract.csv
+  filename: SEMCOG_2020_control_totals_tract.csv
   column_map:
     BLKGRPID: BLKGRP
     TRACTID: TRACT
@@ -47,7 +47,7 @@ input_table_list:
 household_weight_col: WGTP
 household_id_col: hh_id
 total_hh_control: num_hh
-control_file_name: SEMCOG_2019_controls.csv
+control_file_name: SEMCOG_2020_controls.csv
 output_tables:
   action: include
   tables:
