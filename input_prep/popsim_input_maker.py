@@ -89,8 +89,11 @@ df_geo.columns = [col.upper() for col in df_geo.columns]
 
 # %%
 # depends on synthesizing year, switch to different tract-PUMA files
-if acs_year >= 2017:
-    df_tract_puma = pd.read_csv(geo["tract_puma_file"], dtype=str)
+if acs_year >= 2020:
+    df_tract_puma = pd.read_csv(geo["tract20_puma10_file"], dtype=str)
+    df_tract_puma.rename(columns={"PUMACE10": "PUMA"}, inplace=True)
+elif (acs_year >= 2017) & (acs_year < 2020):
+    df_tract_puma = pd.read_csv(geo["tract10_puma10_file"], dtype=str)
     df_tract_puma.rename(columns={"PUMA5CE": "PUMA"}, inplace=True)
 elif (acs_year >= 2010) & (acs_year <= 2016):
     df_tract_puma = pd.read_csv(
@@ -204,8 +207,8 @@ p_pums = pd.read_csv(p_pums_csv, dtype={"SERIALNO": str, "PUMA": str})
 
 # Census might change variable names by year, changed variables are in region config file
 # https://www2.census.gov/programs-surveys/acs/tech_docs/pums/ACS2019_PUMS_README.pdf?
-h_pums = acs_update(h_pums, conf['census_updates'][acs_year])
-p_pums = acs_update(p_pums, conf['census_updates'][acs_year])
+h_pums = pums_update(h_pums, conf['pums_var_updates'][acs_year])
+p_pums = pums_update(p_pums, conf['pums_var_updates'][acs_year])
 
 emp_df = pd.DataFrame()
 h_samples, p_samples = [], []
@@ -357,7 +360,7 @@ shutil.copy(
     output_folder + "{}_{}_controls.csv".format(prj_name, str(acs_year)),
 )
 
-# %% [markdown]
+# %% 
 print(
     "\ntotal time: {} seconds".format(round(time.time() - t0, 1)),
     "\nDone. All files are saved to " + output_folder,
@@ -365,3 +368,4 @@ print(
     '\n\t copy new settings and controls to configs folder and rename "xxx_settings.yaml" to "settings.yaml"',
     f'\n\t copy other files in {acs_year}/data folder to data/{acs_year}/'
 )
+
