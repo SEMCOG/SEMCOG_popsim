@@ -1,8 +1,8 @@
 # %%
 # this script generate single or multiple output plots for popsim outputs
-# specity input dictionary with 
-# 1. popsim summary files (popsim summaries) 
-# 2. plot names 
+# specity input dictionary with
+# 1. popsim summary files (popsim summaries)
+# 2. plot names
 # 3. output_folder
 
 # %%
@@ -58,49 +58,20 @@ def sub_error_plot(df, ax=None, tle_text=""):
 
 
 # %%
-def sub_error_plot1(df, ax=None, tle_text=""):
-    """
-    df generated from pct_diff.describe()
-    plot shows mean values   
-    """
-    sns.set(font_scale=2)
-    if ax is None:
-        ax = plt.gca()
-    ax.vlines(0, 0, len(df))  # draw the y axis on 0
-    ax.errorbar(
-        df["mean"],
-        range(len(df.index)),
-        xerr=[df["mean"] - df["min"], df["max"] - df["mean"]],
-        fmt="ok",
-        ecolor="gray",
-        lw=1,
-        capsize=8,
-    )
-    ax.errorbar(df["mean"], range(len(df.index)), xerr=df["std"], fmt="ok", lw=4)
-
-    for (x, y, l) in zip(df["mean"], range(len(df.index)), round(df["mean"], 3)):
-        ax.text(50, y + 0.1, l, size=20)
-
-    ax.set_title(tle_text + " PCT ERRORS")
-    ax.set_yticks(range(len(df.index)))
-    ax.set_yticklabels(df.index)
-
-    return ax
-
-
-# %%
 def compare_plots(lst_dfs):
     """
     subplots with dimension 1 x X (X is the number of df being compared)
     df should have name
     """
     sns.set(font_scale=2)
+
     fig, axs = plt.subplots(
         1,
         len(lst_dfs),
         sharex=True,
         sharey=True,
-        figsize=(30, max(5, len(lst_dfs[0]))),
+        # figsize=(30, max(5, len(lst_dfs[0]))),
+        figsize=(30, max([len(df) for df in lst_dfs] + [5])),
         gridspec_kw={"hspace": 0, "wspace": 0.02},
     )
     c = 0
@@ -114,11 +85,85 @@ def compare_plots(lst_dfs):
     return fig
 
 
+def popsim_cpt_err(dfsum):
+    flds = [
+        x.replace("_control", "")
+        for x in dfsum.columns.values
+        if x.find("_control") >= 0
+    ]
+    controls, results = [x + "_control" for x in flds], [x + "_result" for x in flds]
+    dfc, dfr = dfsum[controls], dfsum[results]
+    dfc.columns = flds
+    dfr.columns = flds
+    df_cpt_dif = pct_dif(dfc, dfr)
+    dfp = df_cpt_dif.describe().T.sort_index(axis=0, ascending=False)
+
+    return dfp
+
+
 # %%
+# popsim summary single chart
+output_folder = "../output/2020_census_blkgrp"
+folder_name = output_folder[output_folder.rfind("/") + 1 :]
+syn_geos = ["BLKGRP", "TRACT"]
+dt_sum = {
+    f"{folder_name}_{g}": f"{output_folder}/final_summary_{g}.csv" for g in syn_geos
+}
+
+lst_dfs = []
+for k in dt_sum.keys():
+    print(k)
+    df_sum = pd.read_csv(dt_sum[k], index_col="id")
+    df_err = popsim_cpt_err(df_sum)
+    df_err.name = k
+    lst_dfs.append(df_err)
+
+for df in lst_dfs:
+    fig = compare_plots([df])
+    fig.savefig(f"{output_folder}/{df.name}_error_plot.png", bbox_inches="tight")
+    print("error plot saved to " + f"{output_folder}/{df.name}_error_plot.png")
+
+
+# %%
+# compare results from different runs or different synthesizers
+dt_sum = {
+    "synpop": "synthpop/oakland_BLKGRP_summary.csv",
+    "result": "output/summary_BLKGRP.csv",
+}
+names = {"synpop": "synthpop", "result": "populationsim"}
+
+lst_dfs = []
+lst_diffs = []
+
+for k in dt_sum.keys():
+    df_sum = pd.read_csv(dt_sum[k], index_col="id")
+    df_err = popsim_cpt_err(df_sum)
+    df_err.name = k
+    lst_diffs.append(df_err)
+
+fig = compare_plots(lst_dfs)
+fig.savefig(
+    f"{output_folder}/{list(names.keys())[0]}_error_plot.png", bbox_inches="tight"
+)
+print(
+    "error plot saved to " + f"{output_folder}/{list(names.keys())[0]}_error_plot.png"
+)
+
+# %%
+# compare results from different runs or different synthesizers
 # dt_sum = {'synpop': 'synthpop/oakland_BLKGRP_summary.csv', 'result':'output/summary_BLKGRP.csv'}
 # names = {'synpop': 'synthpop', 'result':'populationsim'}
-dt_sum = {"result1": "../output/2020_pass2/final_summary_BLKGRP.csv"}
-names = {"result1": "SEMCOG2020_pass2"}
+output_folder = "../output/2020_census_blk"
+dt_sum = {
+    "result1": f"{output_folder}/final_summary_BLK.csv",
+    "result2": f"{output_folder}/final_summary_BLKGRP.csv",
+    "result3": f"{output_folder}/final_summary_TRACT.csv",
+}
+names = {
+    "result1": "2020_census_blk_blk",
+    "result2": "2020_census_blk_blkgrp",
+    "result3": "2020_census_blk_tract",
+}
 lst_dfs = []
 lst_diffs = []
 
@@ -143,9 +188,12 @@ for k in dt_sum.keys():
 
 
 fig = compare_plots(lst_dfs)
-output_folder = '../output/2020_pass2/'
-fig.savefig(f"{output_folder}/{list(names.keys())[0]}_error_plot.png", bbox_inches="tight")
-
+fig.savefig(
+    f"{output_folder}/{list(names.keys())[0]}_error_plot.png", bbox_inches="tight"
+)
+print(
+    "error plot saved to " + f"{output_folder}/{list(names.keys())[0]}_error_plot.png"
+)
 
 # %% [markdown]
 # ## Histograms by attributes
