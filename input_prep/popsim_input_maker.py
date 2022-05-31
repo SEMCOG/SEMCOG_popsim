@@ -44,7 +44,7 @@ t0 = time.time()
 
 # %%
 conf = yaml.load(open("./" + args.yaml, "r"), Loader=yaml.Loader)
-# conf = yaml.load(open("./2019/region_2019.yaml", "r"), Loader=yaml.Loader)
+# conf = yaml.load(open("./2020/region_2020.yaml", "r"), Loader=yaml.Loader)
 
 # %%
 prj = conf["project"]
@@ -77,8 +77,11 @@ print(f"\n *** synthersizing {target} for year {acs_year} ***")
 # step 1. make geographic cross work file
 c = Census(args.key, year=acs_year)
 
+
 # %%
-print(f"\nPreparing Census geographies crosswalk: \n\tstate: {state}  \n\tcounty: {counties}")
+print(
+    f"\nPreparing Census geographies crosswalk: \n\tstate: {state}  \n\tcounty: {counties}"
+)
 # download Census BGs for this region
 acgeo = Census_Downloader(c.acs5, state, counties, "*", "*")
 
@@ -110,8 +113,8 @@ else:
     exit()
 
 df_tract_puma = df_tract_puma.loc[df_tract_puma.STATEFP == acgeo.states]
-df_tract_puma["COUNTYID"] = (df_tract_puma["STATEFP"] + df_tract_puma["COUNTYFP"])
-df_tract_puma["TRACTID"] = (df_tract_puma["COUNTYID"] + df_tract_puma["TRACTCE"])
+df_tract_puma["COUNTYID"] = df_tract_puma["STATEFP"] + df_tract_puma["COUNTYFP"]
+df_tract_puma["TRACTID"] = df_tract_puma["COUNTYID"] + df_tract_puma["TRACTCE"]
 
 
 # %%
@@ -132,7 +135,7 @@ df_geo_cross.to_csv(output_folder + output_geo_cross)
 # "acs_variables" contains Census variables and expressions
 #
 
-cs = eval(f'c.{acs_sample}')  # set API type
+cs = eval(f"c.{acs_sample}")  # set API type
 
 print("\nCreating popsim marginal controls: ", acs_year)
 print("  downloading Census variables ...")
@@ -141,7 +144,9 @@ dic_margs = {}
 for geo, dfgeo in dfc.groupby("geography"):
     full_vars = list(
         set(
-            re.findall(r"[B-C][0-9]{5}[A-Z]{0,1}_[0-9]{3}E", str(list(dfgeo.acs_variables)))
+            re.findall(
+                r"[B-C][0-9]{5}[A-Z]{0,1}_[0-9]{3}E", str(list(dfgeo.acs_variables))
+            )
         )
     )
     if geo == "BLKGRP":
@@ -159,7 +164,7 @@ for geo, dfgeo in dfc.groupby("geography"):
 
     if "GEO_ID" in dic_margs[geo].columns:
         # new Census API downloads an extra "GEO_ID" column
-        dic_margs[geo].drop('GEO_ID', axis=1, inplace=True)
+        dic_margs[geo].drop("GEO_ID", axis=1, inplace=True)
 
 # %%
 # Compute popsim control variables from Census marginals
@@ -175,15 +180,15 @@ for geo, dfg in dfc.groupby("geography"):
 
 # %%
 ctr_geos = {}
-mapping_dict = {4: 'BLKGRPID', 3: "TRACTID", 2: "COUNTYID"}
+mapping_dict = {4: "BLKGRPID", 3: "TRACTID", 2: "COUNTYID"}
 for geo, dfm in dic_margs.items():
-    dfm[mapping_dict[dfm.index.nlevels]] = dfm.index.map(''.join)
+    dfm[mapping_dict[dfm.index.nlevels]] = dfm.index.map("".join)
     dfm.reset_index(drop=True, inplace=True)
     dfm.fillna(0, inplace=True)
     dfm.columns = [col.upper() for col in dfm.columns]
 
-    if "HHBASE" in dfm.columns:
-        dfm = dfm.loc[dfm.HHBASE > 0]
+    # if "HHBASE" in dfm.columns:
+    #    dfm = dfm.loc[dfm.HHBASE >= 0]
 
     f_output_control = output_control.replace(".csv", geo.lower() + ".csv")
     ctr_geos[geo] = f_output_control
@@ -207,8 +212,8 @@ p_pums = pd.read_csv(p_pums_csv, dtype={"SERIALNO": str, "PUMA": str})
 
 # Census might change variable names by year, changed variables are in region config file
 # https://www2.census.gov/programs-surveys/acs/tech_docs/pums/ACS2019_PUMS_README.pdf?
-h_pums = pums_update(h_pums, conf['pums_var_updates'][acs_year])
-p_pums = pums_update(p_pums, conf['pums_var_updates'][acs_year])
+h_pums = pums_update(h_pums, conf["pums_var_updates"][acs_year])
+p_pums = pums_update(p_pums, conf["pums_var_updates"][acs_year])
 
 emp_df = pd.DataFrame()
 h_samples, p_samples = [], []
@@ -267,10 +272,12 @@ p_pums = pd.merge(
 )
 
 print(
-    f"- saving seed households: {output_folder+output_seed_hhs}.| total {str(len(h_pums))} records")
+    f"- saving seed households: {output_folder+output_seed_hhs}.| total {str(len(h_pums))} records"
+)
 h_pums.to_csv(output_folder + output_seed_hhs)
 print(
-    f"- saving seed persons: {output_folder+output_seed_persons}.| total {str(len(p_pums))} records")
+    f"- saving seed persons: {output_folder+output_seed_persons}.| total {str(len(p_pums))} records"
+)
 p_pums.to_csv(output_folder + output_seed_persons)
 
 
@@ -287,6 +294,7 @@ SORT_ORDER = [
     "TRACT",
     "BLKGRP",
     "TAZ",
+    "BLK",
     "BUILDING",
 ]
 sorted_geos = list(ctr_geos.keys())
@@ -356,16 +364,15 @@ with open(
 # # copy pre control file
 print("copy popsim master control file")
 shutil.copy(
-    pre_control,
-    output_folder + "{}_{}_controls.csv".format(prj_name, str(acs_year)),
+    pre_control, output_folder + "{}_{}_controls.csv".format(prj_name, str(acs_year)),
 )
 
-# %% 
+# %%
 print(
     "\ntotal time: {} seconds".format(round(time.time() - t0, 1)),
     "\nDone. All files are saved to " + output_folder,
-    '\nTo run Populationsim:',
+    "\nTo run Populationsim:",
     '\n\t copy new settings and controls to configs folder and rename "xxx_settings.yaml" to "settings.yaml"',
-    f'\n\t copy other files in {acs_year}/data folder to data/{acs_year}/'
+    f"\n\t copy other files in {acs_year}/data folder to data/{acs_year}/",
 )
 
