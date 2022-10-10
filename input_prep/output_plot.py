@@ -100,10 +100,19 @@ def popsim_cpt_err(dfsum):
 
     return dfp
 
+def make_large_area_id(df, df_geo):
+    # df contains a equivalant geo id as index, such as track, block group etc
+    # df_geo has all equivalant geo id, SEMMCD and County ID
+    df[['SEMMCD', 'COUNTY']] = df_geo[['SEMMCD', 'COUNTY']]
+    df["LARGE_AREA_ID"] = df['COUNTY']
+    df.loc[df.COUNTY==163, "LARGE_AREA_ID"] = 3
+    df.loc[df.SEMMCD==5, "LARGE_AREA_ID"] = 5
+    df.drop(['SEMMCD', 'COUNTY'], axis=1, inplace=True)
+    return df
 
 # %%
 # popsim summary single chart
-output_folder = "../output/2020_census_blkgrp"
+output_folder = "../output/2020_oct_run3"
 folder_name = output_folder[output_folder.rfind("/") + 1 :]
 syn_geos = ["BLKGRP", "TRACT"]
 dt_sum = {
@@ -122,6 +131,24 @@ for df in lst_dfs:
     fig = compare_plots([df])
     fig.savefig(f"{output_folder}/{df.name}_error_plot.png", bbox_inches="tight")
     print("error plot saved to " + f"{output_folder}/{df.name}_error_plot.png")
+
+# %%
+df_geo = pd.read_csv("../data/Census2020_Tract_BG_BLK.csv")
+df_geo = df_geo.loc[df_geo.GEOTYPE=="TRACT"].set_index("GEOID20")
+
+df_diff = pd.read_csv(dt_sum[f"{folder_name}_TRACT"], index_col='id')
+cols=[c for c in df_diff.columns if "_diff" in c]
+df_diff = make_large_area_id(df_diff, df_geo)
+
+
+df_diff_la = df_diff[cols + ["LARGE_AREA_ID"]].groupby("LARGE_AREA_ID").sum().T.astype(int)
+
+df_diff_la.to_csv(output_folder + "diff_sum_large_area.csv")
+# %%
+
+
+
+# %%
 
 
 # %%
