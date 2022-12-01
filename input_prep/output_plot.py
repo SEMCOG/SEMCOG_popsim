@@ -112,7 +112,7 @@ def make_large_area_id(df, df_geo):
 
 # %%
 # popsim summary single chart
-output_folder = "../output/2020_oct_run3"
+output_folder = "../output/2020_nov_run1"
 folder_name = output_folder[output_folder.rfind("/") + 1 :]
 syn_geos = ["BLKGRP", "TRACT"]
 dt_sum = {
@@ -133,22 +133,21 @@ for df in lst_dfs:
     print("error plot saved to " + f"{output_folder}/{df.name}_error_plot.png")
 
 # %%
-df_geo = pd.read_csv("../data/Census2020_Tract_BG_BLK.csv")
+#summarize synthesis results at large area level. using tract summary file
+df_geo = pd.read_csv("../data/Census2020_Tract_BG_LARGEAREA.csv")
 df_geo = df_geo.loc[df_geo.GEOTYPE=="TRACT"].set_index("GEOID20")
 
 df_diff = pd.read_csv(dt_sum[f"{folder_name}_TRACT"], index_col='id')
 cols=[c for c in df_diff.columns if "_diff" in c]
-df_diff = make_large_area_id(df_diff, df_geo)
-
+df_diff["LARGE_AREA_ID"] = df_geo["LARGE_AREA_ID"]
 
 df_diff_la = df_diff[cols + ["LARGE_AREA_ID"]].groupby("LARGE_AREA_ID").sum().T.astype(int)
 
 df_diff_la.to_csv(output_folder + "diff_sum_large_area.csv")
+
+
 # %%
 
-
-
-# %%
 
 
 # %%
