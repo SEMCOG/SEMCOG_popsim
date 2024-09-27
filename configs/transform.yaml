@@ -1,0 +1,47 @@
+# Mapping column names
+building_types:
+  description:        building_type_description
+  general_type:       generic_building_type_name
+  naics_sectors:      naics
+  # missing columns:
+  # generic_building_type_description
+  # generic_building_type_id
+events_addition:
+  build_type:         building_type_id
+  nonres_sqft:        non_residential_sqft
+  housing_units:      residential_units
+events_deletion:
+  year_demo:          year_built
+households:
+  AGEHOH:             age_of_head
+  VEH:                cars
+  # NOC:                children
+  NP:                 persons
+  HRACE:              race_id
+  HWORKERS:           workers
+  HHT:                hht
+  hh_id:              seed_id
+persons:
+  agep:               age
+  # member_id
+  # race_id
+  # relate
+  # worker
+group_quarters_households:
+  AGEHOH:             age_of_head
+  VEH:                cars
+  NOC:                children
+  NP:                 persons
+  HRACE:              race_id
+  HWORKERS:           workers
+  HHT:                hht
+  SERIALNO:           seed_id
+
+jobs:
+  sq_ft_per_job:      sqft # need confirmation
+land_use_types:
+  generic_land_use_type_description: generic_land_use_type_descripti # 2045 column name truncated
+# refiner_events:
+  # location_capacity_attribute # this var are all NaN in 2045, still needed?
+semmcds:
+  area_name:          city_name
