@@ -71,6 +71,14 @@ def main():
     new_hh, new_p = refine_pop_single_year(hh, p, b, refinement, refine_geo)
     new_hh.to_csv('/mnt/hgfs/urbansim/RDF2050/population_synthesis/historical/2015(2017)/092324_run_2015/households_after_refinement.csv')
     new_p.to_csv('/mnt/hgfs/urbansim/RDF2050/population_synthesis/historical/2015(2017)/092324_run_2015/persons_after_refinement.csv')
+    review = pd.DataFrame({
+        'pop_refinement': refinement, 
+        'before_refinement': hh.groupby('semmcd').sum()['persons'], 
+        'after_refinement': new_hh.groupby('semmcd').sum()['persons']
+    }).fillna(0).astype(int)
+    review['diff'] = review['after_refinement'] - review['pop_refinement']
+    review.to_csv('/mnt/hgfs/urbansim/RDF2050/population_synthesis/historical/2015(2017)/092324_run_2015/pop_refinement_review.csv')
+
     return
     
 if __name__ == "__main__":
