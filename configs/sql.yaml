@@ -1,0 +1,230 @@
+# Config file for PostgreSQL database
+
+# SQL connection info
+db_connection_str: postgresql://gisad:forecast20@plannerprojection:5432/land
+
+# SQL to get all tables
+sql_list_tables: >
+  SELECT * FROM pg_catalog.pg_tables 
+  WHERE schemaname = 'gisad';
+
+# List of tables to load from SQL database
+# Table to add:
+# - Jobs from posgresql
+sql_tables_to_load:
+  - 
+    name: parcels
+    sql: >
+      SELECT
+      up.parcel_id,
+      up.census_bg_id,
+      up.centroid_x,
+      up.centroid_y,
+      up.city_id,
+      up.county_id,
+      up.land_use_type_id,
+      up.large_area_id,
+      up.parcel_area parcel_sqft,
+      up.pptytax,
+      up.school_id,
+      up.semmcd,
+      up.sev_value,
+      up.landvalue,
+      up.bldgimprval,
+      tt10.tdfm_tazid zone_id
+      FROM urbansim_parcels up
+      LEFT JOIN terminus_taz_2010 tt10
+      ON up.zone_id = tt10.tazce10_n
+    index_col: parcel_id
+  - 
+    name: buildings_2010_tract
+    sql: >
+      SELECT 
+          urbansim_buildings.building_id,
+          urbansim_buildings.parcel_id, 
+          urbansim_buildings.nonres_sqft AS non_residential_sqft,
+          urbansim_buildings.year_built,
+          urbansim_buildings.residential_units,
+          urbansim_buildings.owner_units,
+          urbansim_buildings.building_type_id,
+          urbansim_buildings.sqft_per_unit,
+          urbansim_buildings.city_id as mcd,
+          urbansim_buildings.stories,
+          urbansim_buildings.market_value,
+          p.county_id AS county,
+          substring(p.block10_id, 1, 6) tract,
+          substring(p.block10_id, 8, 3) block,
+          substring(p.block10_id, 7, 1) bg
+      FROM urbansim_buildings
+      LEFT JOIN terra_parcels_2019 p ON 
+          urbansim_buildings.parcel_id=p.parcel_id;
+    index_col: building_id
+  - 
+    name: buildings
+    sql: >
+      SELECT 
+          urbansim_buildings.building_id,
+          urbansim_buildings.parcel_id, 
+          urbansim_buildings.nonres_sqft AS non_residential_sqft,
+          urbansim_buildings.year_built,
+          urbansim_buildings.residential_units,
+          urbansim_buildings.owner_units,
+          urbansim_buildings.building_type_id,
+          urbansim_buildings.sqft_per_unit,
+          urbansim_buildings.city_id as mcd,
+          urbansim_buildings.stories,
+          urbansim_buildings.market_value,
+          urbansim_buildings.land_area,
+          p.county_id AS county,
+          substring(p.census_block_id, 1, 6)::INT tract,
+          substring(p.census_block_id, 8, 3)::INT block,
+          substring(p.census_block_id, 7, 1)::INT bg
+      FROM urbansim_buildings
+          LEFT JOIN urbansim_parcels as p ON 
+              urbansim_buildings.parcel_id=p.parcel_id;
+    index_col: building_id
+  -
+    name: pseudo_building_2020_placement
+    sql: >
+      SELECT 
+          urbansim_pseudo_2020.building_id + 90000000 building_id,
+          urbansim_pseudo_2020.parcel_id, 
+          urbansim_pseudo_2020.nonres_sqft AS non_residential_sqft,
+          urbansim_pseudo_2020.year_built,
+          urbansim_pseudo_2020.housing_units residential_units,
+          0 owner_units,
+          urbansim_pseudo_2020.build_type building_type_id,
+          0 sqft_per_unit,
+          urbansim_pseudo_2020.city_id as mcd,
+          urbansim_pseudo_2020.stories,
+          0 market_value,
+          tm.county_id county,
+          -1 tract, 
+          -1 block,
+          -1 bg
+      FROM urbansim_pseudo_2020
+      left join terminus_mcd tm
+      on urbansim_pseudo_2020.city_id = tm.semmcd;
+    index_col: building_id
+  -
+    name: zoning
+    # missing some columns in postgres
+    #   max_height, max_stories,
+    sql: >
+      SELECT 
+      parcel_id, future_use, max_dua, floor_area_ratio max_far,
+      percent_undev pct_undev, max_height, max_stories, is_developable,
+      type11, type13, type14, type21, type23, type31, type32, type33, type41, type42,
+      type51, type52, type53, type61, type63, type65, type71, type81, type82, type83,
+      type84, type91, type92, type93, type94, type95
+       FROM urbansim_zoning
+    index_col: parcel_id
+  - 
+    name: block_to_many_mcd
+    sql: >
+      SELECT 
+        block::VARCHAR(15),
+        -- MIN(city_id) as mcd -- use MIN for now
+        JSONB_AGG(DISTINCT city_id) AS mcd
+        -- MAX(city_id) as max,
+        -- count(*)
+      FROM (
+      SELECT 
+        city_id,
+        block.geoid20 AS block
+      FROM urbansim_parcels
+        LEFT JOIN terminus_block_2020 as block ON 
+        CONCAT(block.tractce20, block.blockce20)=urbansim_parcels.census_block_id
+      ) as p
+      GROUP BY (block)
+    index_col:
+      - block
+  - 
+    name: zones
+    sql: > 
+      SELECT 
+        (26*1000 + county)::varchar(255) || '000' || tazce10_n AS taz,
+        tazce10_n,
+        tdfm_tazid AS zone_id,
+        (ST_AREA(the_geom) / 43560) AS acres
+      FROM terminus_taz_2010;
+    index_col: zone_id
+  - 
+    name: crime_rates
+    sql: >
+        SELECT p.parcel_id,
+          c.violent_rate AS ucr_crime_rate,
+          c.property_rate AS other_crime_rate
+        FROM urbansim_parcels AS p
+        LEFT JOIN urbansim_crime_rates AS c
+        ON c.city_id = p.city_id;
+    index_col: parcel_id
+  # - 
+  #   name: building_types
+  #   sql: >
+  #       SELECT * FROM urbansim_building_types
+  #   index_col: building_type_id
+  # -
+  #   name: building_type_allowed
+  #   sql: >
+  #       SELECT * from urbansim_building_type_allowed
+  #   index_col: null
+  - 
+    name: urbansim_millage_rates
+    sql: >
+        SELECT * FROM urbansim_millage_rates
+    index_col: null
+  # -
+  #   name: parcel_undevelopable
+  #   sql: >
+  #       SELECT * FROM urbansim_parcel_undevelopable
+  #   index_col: parcel_id
+  - 
+    name: land_use_types
+    sql: >
+        SELECT * FROM urbansim_landuse_types
+    index_col: land_use_type_id
+  - 
+    name: demolition_rates
+    sql: >
+        SELECT * FROM urbansim_demolition_rates
+    index_col: city_id
+  - 
+    name: events_addition
+    sql: >
+        SELECT 
+          gid objectid, event_id, build_type, year_built, res_sqft, nonres_sqft, parcel_id, housing_units, gqcap, city_id, stories, 
+          dev_type, median_hgt, building_id, tdfm_id zone_id
+        FROM terra_events_2050 WHERE year_built > 2019
+    index_col: objectid
+  - 
+    name: events_deletion
+    sql: >
+        SELECT
+          gid objectid, building_id, median_hgt, year_demo, demolished
+        FROM terra_demos_2050
+    index_col: objectid
+  -
+    name: multi_parcel_buildings
+    sql: >
+        SELECT * 
+        FROM urbansim_multi_parcel_buildings;
+    index_col: null
+  -
+    name: semmcds
+    sql: >
+        SELECT
+          semmcd semmcd_id, county_id, large_area_id, area_name 
+        from terminus_mcd;
+    index_col: semmcd_id
+  # -
+  #   name: crime_rates
+  #   sql: >
+  #       SELECT * from urbansim_crime_rates;
+  #   index_col: city_id
+  # -
+  #   name: employment_sectors
+  #   sql: >
+  #       SELECT * from laboris_naics_sector_mapping;
+  #   index_col: null
+
