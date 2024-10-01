@@ -25,6 +25,10 @@
 # [year]/data/SEMCOG_[year]_settings.yaml   (modified setting file)
 # %%
 import os
+#change working directory
+os.chdir("/home/da/populationsim/SEMCOG_popsim/input_prep")
+
+#%%
 import re
 import time
 import pandas as pd
@@ -35,18 +39,21 @@ from input_utils import *
 import argparse
 import shutil
 
+
 # %%
-parser = argparse.ArgumentParser()
-parser.add_argument("key", help="Census API key")
-parser.add_argument("yaml", help="yaml configuration file name")
-args = parser.parse_args()
+# parser = argparse.ArgumentParser()
+# parser.add_argument("key", help="Census API key")
+# parser.add_argument("yaml", help="yaml configuration file name")
+# args = parser.parse_args()
 t0 = time.time()
 
 # %%
-conf = yaml.load(open("./" + args.yaml, "r"), Loader=yaml.Loader)
-# conf = yaml.load(open("./2020/region_2020.yaml", "r"), Loader=yaml.Loader)
+
+#conf = yaml.load(open("./" + args.yaml, "r"), Loader=yaml.Loader)
+conf = yaml.load(open("./2022/prepare_2022.yaml", "r"), Loader=yaml.Loader)
 
 # %%
+# set up project information from yaml
 prj = conf["project"]
 prj_name = prj["name"]
 target = prj["target"]
@@ -70,13 +77,15 @@ output_control = "{}_{}_control_totals_.csv".format(prj_name, str(acs_year))
 output_seed_hhs = "{}_{}_seed_households.csv".format(prj_name, str(acs_year))
 output_seed_persons = "{}_{}_seed_persons.csv".format(prj_name, str(acs_year))
 
-print(f"\n *** synthersizing {target} for year {acs_year} ***")
-
+print(f"\n *** preparing {target} synthesisdata for year {acs_year} ***")
 
 # %% [markdown]
 # step 1. make geographic cross work file
-c = Census(args.key, year=acs_year)
+if (acs_year<2010) or (acs_year>=2026):
+    print("synthesis year should be between 2010 and 2026")
+    exit()
 
+c = Census("b01f26cd56a7f5457534e8436a1e63f4c7189b23", year=acs_year)
 
 # %%
 print(
@@ -92,30 +101,33 @@ df_geo.columns = [col.upper() for col in df_geo.columns]
 
 # %%
 # depends on synthesizing year, switch to different tract-PUMA files
-if acs_year >= 2020:
-    df_tract_puma = pd.read_csv(geo["tract20_puma10_file"], dtype=str)
-    df_tract_puma.rename(columns={"PUMACE10": "PUMA"}, inplace=True)
-elif (acs_year >= 2017) & (acs_year < 2020):
-    df_tract_puma = pd.read_csv(geo["tract10_puma10_file"], dtype=str)
-    df_tract_puma.rename(columns={"PUMA5CE": "PUMA"}, inplace=True)
-elif (acs_year >= 2010) & (acs_year <= 2016):
-    df_tract_puma = pd.read_csv(
-        "../" + pre_folder + geo["tract_puma0010_file"], dtype=str
-    )
-    df_tract_puma.columns = [col.upper() for col in df_tract_puma.columns]
-    if acs_year >= 2012:
-        df_tract_puma.fillna("00000", inplace=True)
-        df_tract_puma["PUMA"] = df_tract_puma["PUMA10_ID"] + df_tract_puma["PUMA00_ID"]
-    else:
-        df_tract_puma.rename(columns={"PUMA00_ID": "PUMA"}, inplace=True)
-else:
-    print("synthesis year should be 2010 or later")
-    exit()
+# %%
+dict_cross = {
+    ("TRACT10", "PUMA00"): "2010_Census_Tract_to_2000_PUMA_SEMCOG.csv",
+    ("TRACT10", "PUMA10"): "2010_Census_Tract_to_2010_PUMA_SEMCOG.csv",
+    ("TRACT20", "PUMA10"): "2020_Census_Tract_to_2010_PUMA_SEMCOG.csv",
+    ("TRACT20", "PUMA20"): "2020_Census_Tract_to_2020_PUMA_SEMCOG.csv",
+}
 
-df_tract_puma = df_tract_puma.loc[df_tract_puma.STATEFP == acgeo.states]
-df_tract_puma["COUNTYID"] = df_tract_puma["STATEFP"] + df_tract_puma["COUNTYFP"]
-df_tract_puma["TRACTID"] = df_tract_puma["COUNTYID"] + df_tract_puma["TRACTCE"]
+dict_acs_pums = {
+    (2010,2011):[("TRACT10", "PUMA00")],
+    (2012,2013,2014,2015,2016):[("TRACT10", "PUMA00"),("TRACT10", "PUMA10")],
+    (2017,2018,2019):[("TRACT10", "PUMA10")],
+    (2020,2021):[("TRACT20", "PUMA10")],
+    (2022,2023,2024,2025,2026):[("TRACT20", "PUMA10"),("TRACT20", "PUMA20")]
+}
 
+# %%
+# compile a tract-to-PUMA crosswalk file
+for yrs, vals in dict_acs_pums.items():
+    if acs_year in yrs:
+        if len(vals) == 1:
+            df_tract_puma = read_tract_puma_crosswalk(vals[0], dict_cross)
+        else:
+            df_tract_puma = read_tract_puma_crosswalk(vals[0], dict_cross)
+            df_tract_puma1 = read_tract_puma_crosswalk(vals[1], dict_cross)
+            df_tract_puma['PUMA'] = df_tract_puma['PUMA'] + df_tract_puma1['PUMA']
+        df_tract_puma = df_tract_puma.reset_index()
 
 # %%
 # join tract-PUMA and creat geo cross file
@@ -197,65 +209,42 @@ for geo, dfm in dic_margs.items():
     dfm.to_csv(output_folder + f_output_control)
     marginal_summary(dfm)
 
+
 # %% [markdown]
 # step 3. extract PUMS seed households and persons
-
 print("\nExtrating PUMS seed households and persons from state samples")
 
-# %%
 puma_lst = df_geo_cross.PUMA.unique()
 
-# %%
 h_pums = pd.read_csv(h_pums_csv, dtype={"SERIALNO": str, "PUMA": str})
 h_pums = h_pums.set_index("SERIALNO")  # keep index as string, one-liner doesn't work
 p_pums = pd.read_csv(p_pums_csv, dtype={"SERIALNO": str, "PUMA": str})
 
 # Census might change variable names by year, changed variables are in region config file
 # https://www2.census.gov/programs-surveys/acs/tech_docs/pums/ACS2019_PUMS_README.pdf?
-h_pums = pums_update(h_pums, conf["pums_var_updates"][acs_year])
-p_pums = pums_update(p_pums, conf["pums_var_updates"][acs_year])
+if acs_year in conf["pums_var_updates"]:
+    h_pums = pums_update(h_pums, conf["pums_var_updates"][acs_year])
+    p_pums = pums_update(p_pums, conf["pums_var_updates"][acs_year])
 
 emp_df = pd.DataFrame()
 h_samples, p_samples = [], []
 count = 0
 
-if (acs_year <= 2011) or (acs_year >= 2017):
-    h_pums = h_pums.loc[h_pums.PUMA.isin(puma_lst)]
-    p_pums = p_pums.loc[p_pums.PUMA.isin(puma_lst)]
-else:
-    pums_grp = {}
-    for pma in ["PUMA10", "PUMA00"]:
-        pums_grp[pma] = defaultdict(dict)
-        for indx, grp in h_pums.loc[h_pums[pma] != -9].groupby(pma):
-            pums_grp[pma]["households"][indx] = grp
-        for indx, grp in p_pums.loc[p_pums[pma] != -9].groupby(pma):
-            pums_grp[pma]["persons"][indx] = grp
-        pums_grp[pma]["households"][0] = emp_df
-        pums_grp[pma]["persons"][0] = emp_df
+#%%
+#between pums 2012 and 2016 5-year ACS, PUMS samples are avaiable at two different PUMA areas(00 and 10), need to combine both
+#start from pums 2022 5-year ACS, PUMS samples are avaiable at two different PUMA areas(10 and 20), need to combine both
 
-    for puma in puma_lst:
-        count += 1
-        h_puma = pd.concat(
-            [
-                pums_grp["PUMA10"]["households"][int(puma[:5])],
-                pums_grp["PUMA00"]["households"][int(puma[5:])],
-            ]
-        )
-        h_puma["PUMA"] = puma
-        h_puma.index = str(count) + h_puma.index
-        h_samples.append(h_puma)
-        p_puma = pd.concat(
-            [
-                pums_grp["PUMA10"]["persons"][int(puma[:5])],
-                pums_grp["PUMA00"]["persons"][int(puma[5:])],
-            ]
-        )
-        p_puma["PUMA"] = puma
-        p_puma["SERIALNO"] = str(count) + p_puma["SERIALNO"]
-        p_samples.append(p_puma)
+for yrs, vals in dict_acs_pums.items():
+    if acs_year in yrs:
+        if len(vals) == 1:
+            h_pums = h_pums.loc[h_pums.PUMA.isin(puma_lst)]
+            p_pums = p_pums.loc[p_pums.PUMA.isin(puma_lst)]
+        else:
+            pums_grp = group_pums_data(h_pums, p_pums, vals[0][1], vals[1][1])
+            h_samples, p_samples = combine_puma_data(puma_lst, vals[0][1], vals[1][1], pums_grp)
+            h_pums = pd.concat(h_samples)
+            p_pums = pd.concat(p_samples)
 
-    h_pums = pd.concat(h_samples)
-    p_pums = pd.concat(p_samples)
 
 if target != "housing_units":
     h_pums = h_pums.loc[
