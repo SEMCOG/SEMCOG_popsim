@@ -49,8 +49,8 @@ t0 = time.time()
 
 # %%
 
-conf = yaml.load(open("./" + args.yaml, "r"), Loader=yaml.Loader)
-#conf = yaml.load(open("./2022/prepare_2022.yaml", "r"), Loader=yaml.Loader)
+#conf = yaml.load(open("./" + args.yaml, "r"), Loader=yaml.Loader)
+conf = yaml.load(open("./2022/prepare_2022.yaml", "r"), Loader=yaml.Loader)
 
 # %%
 # set up project information from yaml
@@ -85,7 +85,7 @@ if (acs_year<2010) or (acs_year>=2026):
     print("synthesis year should be between 2010 and 2026")
     exit()
 
-c = Census(args.key, year=acs_year)
+c = Census("b01f26cd56a7f5457534e8436a1e63f4c7189b23", year=acs_year)
 
 # %%
 print(
