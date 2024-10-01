@@ -13,7 +13,7 @@ import pandas as pd
 import re
 from census import Census
 
-
+######### Census Downloader  ######
 # %%
 class Census_Downloader:
     def __init__(
@@ -111,6 +111,25 @@ class Census_Downloader:
 
         return dfm
 
+def read_tract_puma_crosswalk(tup, dict_cross):
+    """
+    Read a tract to PUMA crosswalk file and return a dataframe with the appropriate columns renamed and set as the index.
+
+    Inputs:
+    tup : A tuple containing the column names for the tract and puma variables.
+    dict_cross : A dictionary mapping tuples of tract and puma column names to crosswalk file paths.
+
+    Returns
+    A dataframe with the tractid column set as the index and the puma column renamed to "PUMA".
+    """
+
+    df = pd.read_csv("./geo/" + dict_cross[tup], dtype=str)
+    df["COUNTYID"] = df["STATEFP"] + df["COUNTYFP"]
+    df["TRACTID"] = df["STATEFP"] + df["COUNTYFP"] + df[tup[0]]
+    df = df.set_index("TRACTID")
+    df.rename(columns={tup[1]: "PUMA"}, inplace=True)
+
+    return df[["COUNTYID","PUMA"]]
 
 def preprocess_pums(h_pums, p_pums):
     # h_pums and p_pums must have the same index column 'SERIALNO'
@@ -224,7 +243,72 @@ def pums_update(df, dic_var):
 
     return df
 
+def group_pums_data(h_pums, p_pums, pma0_col, pma1_col):
+    """
+    Group households and persons data by PUMA10 and PUMA00 columns.
 
+    Args:
+        h_pums (DataFrame): Households data.
+        p_pums (DataFrame): Persons data.
+        pma0_col (str): Name of first PUMA column.
+        pma1_col (str): Name of second PUMA column.
+
+    Returns:
+        dict: Nested dictionary with grouped data.
+    """
+    pums_grp = {}
+    emp_df = pd.DataFrame()  # Create an empty DataFrame
+    for pma in [pma0_col, pma1_col]:
+        pums_grp[pma] = {"households": {}, "persons": {}}
+        for indx, grp in h_pums.loc[h_pums[pma] != -9].groupby(pma):
+            pums_grp[pma]["households"][indx] = grp
+        for indx, grp in p_pums.loc[p_pums[pma] != -9].groupby(pma):
+            pums_grp[pma]["persons"][indx] = grp
+        pums_grp[pma]["households"][0] = emp_df
+        pums_grp[pma]["persons"][0] = emp_df
+    return pums_grp
+
+def combine_puma_data(puma_lst, pma0_col, pma1_col, pums_grp):
+    """
+    Combine household and person data from two different PUMA areas.
+
+    Parameters:
+    puma_lst (list): List of PUMA values to combine.
+    pma0_col (str): Key for first PUMA  in pums_grp.
+    pma1_col (str): Key for second PUMA in pums_grp.
+    pums_grp (dict): Dictionary containing PUMA data.
+
+    Returns:
+    h_samples (list): List of combined household DataFrames.
+    p_samples (list): List of combined person DataFrames.
+    """
+    h_samples = []
+    p_samples = []
+    count = 0
+
+    for puma in puma_lst:
+        count += 1
+        h_puma = pd.concat(
+            [
+                pums_grp[pma0_col]["households"][int(puma[:5])],
+                pums_grp[pma1_col]["households"][int(puma[5:])],
+            ]
+        )
+        h_puma["PUMA"] = puma
+        h_puma.index = str(count) + h_puma.index
+        h_samples.append(h_puma)
+
+        p_puma = pd.concat(
+            [
+                pums_grp[pma0_col]["persons"][int(puma[:5])],
+                pums_grp[pma1_col]["persons"][int(puma[5:])],
+            ]
+        )
+        p_puma["PUMA"] = puma
+        p_puma["SERIALNO"] = str(count) + p_puma["SERIALNO"]
+        p_samples.append(p_puma)
+
+    return h_samples, p_samples
 # def control_summary(df_controls, df_margins):
 #     for _, dft in df_controls[['geography', 'attr', 'control_field']].groupby('geography'):
 #         dft = dft[['attr', 'control_field']].groupby('attr').agg(list)
