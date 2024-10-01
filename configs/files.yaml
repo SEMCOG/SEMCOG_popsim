@@ -1,0 +1,212 @@
+# Paths Config 
+
+# Temporary HDF
+old_hdf_path: /home/da/share/urbansim/RDF2045/data/base_year/all_semcog_data_02-02-18-final-forecast.h5
+hdf_storage: UrbanSim_storage.h5
+output_hdf_path: hdf_out.h5
+
+csv_files_to_load:
+  -
+    name: group_quarters_control_totals
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/group_quarters/group_quarters_control_totals_2050.csv
+    kwargs: 
+      index_col: cityid
+  - 
+    name: group_quarters_persons
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/group_quarters/group_quarter_persons.csv
+  -
+    name: group_quarters_households
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/group_quarters/group_quarter_households.csv
+  -
+    name: group_quarters_events
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/group_quarters_events.csv
+    kwargs:
+      index_col: refinement_id
+      
+  
+  # -
+  #   name: group_quarters # 2045 gq pop
+  #   path: /home/da/share/urbansim/RDF2045/data/others/SynthGQ2015_region_matched.csv
+  #   kwargs:
+  #     index_col: personid
+  - 
+    name: employed_workers_rate
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/employed_worker_rates.csv
+    kwargs:
+      index_col: large_area_id
+  # - 
+  #   name: workers_labor_participation_rates
+  #   path: /home/da/share/urbansim/RDF2045/data/others/workers_labor_participation_rates.csv
+  #   kwargs:
+  #     index_col: large_area_id
+  - 
+    name: annual_household_control_totals
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/household_control_totals/annual_household_control_totals_2050_combine_income.csv
+    kwargs:
+      index_col: year
+  -
+    name: travel_data
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/travel_data_2020.csv
+    kwargs:
+      index_col:
+        - from_zone_id
+        - to_zone_id
+  -
+    name: travel_data_2030
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/travel_data_2030.csv
+    kwargs:
+      index_col:
+        - from_zone_id
+        - to_zone_id
+  - 
+    name: remi_pop_total
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/remi_pop_total.csv
+    kwargs:
+      index_col: large_area_id
+  -
+    name: income_growth_rates
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/income_growth_rates.csv
+    kwargs:
+      index_col: year
+  -
+    name: schools
+    excel: True
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/schools.xlsx
+    kwargs:
+      usecols:
+        - bname
+        - bcode
+        - dcode # missing dcode
+        - gradelist
+        - is_grade_school
+        - point_x
+        - point_y
+        - totalachievementindex
+      index_col: bcode
+  - 
+    name: building_types
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/building_types_2050_new.csv
+    kwargs:
+      usecols:
+        - building_type_id
+        - building_type_description
+        - building_type_name
+        - generic_building_type_description
+        - generic_building_type_id
+        - generic_building_type_name
+        - is_residential
+        - naics
+        - unit_name
+      index_col: building_type_id
+  -
+    name: building_sqft_per_job
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/building_sqft_per_job.csv
+    kwargs:
+      index_col: building_type_id
+  -
+    name: transit_stops
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/transit_stops.csv
+    kwargs:
+      index_col: stop_id
+  -
+    name: poi
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/poi.csv
+    kwargs:
+      index_col: 0
+      usecols:
+        - 0
+        - 2
+        - 3
+        - 4
+  -
+    name: landmark_worksites
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/landmark_worksites.csv
+  # - 
+  #   name: income_growth_rates
+  #   path: /home/da/share/urbansim/RDF2045/data/others/income_growth_rates.csv
+  #   kwargs:
+  #     index_col: year
+  - 
+    name: voters_registration
+    path: "/home/da/share/da/Staff/Nutting/RDF2050/Qualified Voter File/Data/placement_2020.csv"
+  -
+    name: orig_synthetic_persons
+    path: /home/da/share/urbansim/RDF2050/population_synthesis/2020/run4_11302022/output/synthetic_persons_backup.csv
+  -
+    name: orig_synthetic_households
+    path: /home/da/share/urbansim/RDF2050/population_synthesis/2020/run4_11302022/output/synthetic_households_backup.csv
+  - 
+    name: jobs
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/jobs.csv
+    kwargs:
+      index_col: job_id
+  - 
+    name: jobs_2019
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/jobs_2019.csv
+    kwargs:
+      index_col: job_id
+  -
+    name: jobs_mapped_to_mixed_use_condos
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/jobs_mapped_to_mixed_use_condos2.csv
+    # kwargs:
+    #   index_col: job_id
+  - 
+    name: annual_employment_control_totals
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/annual_employment_control_totals.csv
+    kwargs:
+      index_col:
+        - year
+        - sector_id
+        - home_based_status
+  - 
+    name: annual_relocation_rates_for_jobs
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/annual_relocation_rates_for_jobs.csv
+    kwargs:
+      index_col: sector_id
+  - 
+    name: emp_refiner_events
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/emp_events.csv
+    kwargs:
+      index_col: refinement_id
+  - 
+    name: target_vacancies_mcd
+    excel: True
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/target_vacancies_mcd.xlsx
+    kwargs:
+      index_col: cityid
+  - 
+    name: target_vacancies
+    excel: True
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/target_vacancies.xlsx
+  - 
+    name: annual_relocation_rates_for_households
+    excel: True
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/annual_relocation_rates_for_households.xlsx
+  -
+    name: mcd_total
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/mcd_totals_2020_2050.csv
+    kwargs:
+      index_col: mcd
+  -
+    name: pseudo_building_2020
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/pseudo_building_2020.csv 
+    kwargs:
+      index_col: building_id
+  -
+    name: pseudo_parcel_2020
+    path: /home/da/share/urbansim/RDF2050/model_inputs/base_tables/pseudo_parcel_2020.csv
+    kwargs:
+      index_col: parcel_id
+# ##############################################################################
+# # Employment event From Brian Folder
+# ##############################################################################
+#   - 
+#     name: refiner_events
+#     path: /home/da/share/data-analysis-drive/Staff/Parthum/MDOT_employment/2014/rdf_input_data/urbansim_table_creation/employment_events/employment_events.txt
+#     kwargs:
+#       index_col: refinement_id
+#     post_processing_steps:
+#       - df.loc[df.year <= 2015, 'year'] = 2016
+#       - df["agents"] = 'jobs'
+
+
