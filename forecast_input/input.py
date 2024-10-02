@@ -37,32 +37,32 @@ def load_from_sql(sql_config, hdf):
 
 
 def load_pop_synthetic_csv(df):
-    df.columns = [
-        "household_id",
-        "PUMA",
-        "tract",
-        "block group",
-        "hh_id",
-        "persons",
-        "cars",
-        "HINCP",
-        "children",
-        "age_of_head",
-        "race_id",
-        "hhisp",
-        "workers",
-        "adjinc",
-        "income",
-        "NOC",
-        "type",
-        "ybl",
-        "bld",
-        "valp",
-        "rent",
-        "ADJHSG",
-        "tenure",
-        "hht",
-    ]
+    df = df.rename(columns={
+        "household_id": "household_id",
+        "PUMA": "PUMA",
+        "TRACT": "tract",
+        "BLKGRP": "block group",
+        "hh_id": "hh_id",
+        "NP": "persons",
+        "VEH": "cars",
+        "HINCP": "HINCP",
+        "R18": "children",
+        "AGEHOH": "age_of_head",
+        "HRACE": "race_id",
+        "HHISP": "hhisp",
+        "HWORKERS": "workers",
+        "ADJINC": "adjinc",
+        "income": "income",
+        "NOC": "NOC",
+        "TYPE": "type",
+        "YBL": "ybl",
+        "BLD": "bld",
+        "VALP": "valp",
+        "GRNTP": "rent",
+        "ADJHSG": "ADJHSG",
+        "TEN": "tenure",
+        "HHT": "hht",
+    })
     return df.set_index("household_id")
 
 

@@ -54,8 +54,13 @@ def main(based_hdf_path, base_sim_run_path, refine_path, gq_path):
             # loop until meet the pop target
             while to_drop != 0:
                 # the hh pool for the city
-                # less than 7 persons hh, not yet been touched
-                pool = hh[(hh.city_id==row.city_id)&(hh.persons<7)&(~hh.index.isin(hh_id_to_drop))&(~hh.index.isin(hh_id_to_add))]
+                small_hh_pool = hh[(hh.city_id==row.city_id)&(hh.persons<7)&(~hh.index.isin(hh_id_to_drop))&(~hh.index.isin(hh_id_to_add))]
+                if small_hh_pool.persons.sum() < to_drop:
+                    # if not enough small hh to drop, use the whole hh pool
+                    pool = hh[(hh[refine_geo]==row[refine_geo])&(~hh.index.isin(hh_id_to_drop))&(~hh.index.isin(hh_id_to_add))]
+                else:
+                    # less than 7 persons hh, not yet been touched
+                    pool = small_hh_pool
                 # if need to add and number is less than 5 and there is no hh in pool that could satisfy that
                 if to_drop < 0 and abs(to_drop) < 5 and -to_drop not in pool.persons.values:
                     # add to remains to solve it later
@@ -167,7 +172,7 @@ def refine_pop_single_year(hh, p, b, refinement, refine_geo='city_id'):
         while to_drop != 0:
             # the hh pool for the city
             # less than 7 persons hh, not yet been touched
-            pool = hh[(hh[refine_geo]==row[refine_geo])&(hh.persons<7)&(~hh.index.isin(hh_id_to_drop))&(~hh.index.isin(hh_id_to_add))]
+            pool = hh[(hh[refine_geo]==row[refine_geo])&(~hh.index.isin(hh_id_to_drop))&(~hh.index.isin(hh_id_to_add))]
             # if need to add and number is less than 5 and there is no hh in pool that could satisfy that
             if to_drop < 0 and abs(to_drop) < 5 and -to_drop not in pool.persons.values:
                 # add to remains to solve it later

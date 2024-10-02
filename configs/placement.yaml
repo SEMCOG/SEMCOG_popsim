@@ -1,9 +1,9 @@
 # files path
-buildings_path:        test_run/BuildingUnit.csv
-recoded_building_path: test_run/BuildingUnit_recoded.csv
-hh_path:               test_run/HHUnit.csv
-recoded_hh_path:       test_run/HHUnit_recoded.csv
-match_result_path:     test_run/match_result_temp.csv
+buildings_path:        output/BuildingUnit.csv
+recoded_building_path: output/BuildingUnit_recoded.csv
+hh_path:               output/HHUnit.csv
+recoded_hh_path:       output/HHUnit_recoded.csv
+match_result_path:     output/match_result_temp.csv
 recode_nu_hh:
   - 0
   - 3
