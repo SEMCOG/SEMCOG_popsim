@@ -2,10 +2,12 @@ from forecast_input.pop_refinement import refine_pop_single_year
 import pandas as pd
 import os
 
-refinement_excel = "/mnt/hgfs/urbansim/RDF2050/population_synthesis/historical/semcog_estimates/PopHHEstimates715.xlsx"
-hdf_path = '/mnt/hgfs/urbansim/RDF2045/data/base_year/all_semcog_data_02-02-18-final-forecast.h5'
-hh_path = '/mnt/hgfs/urbansim/RDF2050/population_synthesis/historical/2015(2017)/092324_run_2015/households.csv'
-p_path = '/mnt/hgfs/urbansim/RDF2050/population_synthesis/historical/2015(2017)/092324_run_2015/persons.csv'
+run_number = '100124_run_2020'
+
+refinement_excel = "/mnt/hgfs/urbansim/RDF2050/population_synthesis/historical/semcog_estimates/PopHHEstimate720.xlsx"
+hdf_path = '/home/da/share/urbansim/RDF2050/model_inputs/base_hdf/forecast_data_input_031523.h5'
+hh_path = '/mnt/hgfs/urbansim/RDF2050/population_synthesis/historical/2020(2022)/100124_run_2020/households.csv'
+p_path = '/mnt/hgfs/urbansim/RDF2050/population_synthesis/historical/2020(2022)/100124_run_2020/persons.csv'
 
 def main():
     refine_geo = 'semmcd'
@@ -70,15 +72,15 @@ def main():
     })
     # semmcd 7027 have 0 buildings, 0 parcels
     new_hh, new_p = refine_pop_single_year(hh, p, b, refinement, refine_geo)
-    new_hh.to_csv('/mnt/hgfs/urbansim/RDF2050/population_synthesis/historical/2015(2017)/092324_run_2015/households_after_refinement.csv')
-    new_p.to_csv('/mnt/hgfs/urbansim/RDF2050/population_synthesis/historical/2015(2017)/092324_run_2015/persons_after_refinement.csv')
+    new_hh.to_csv(os.path.join("output", run_number, "households_after_refinement.csv"))
+    new_p.to_csv(os.path.join("output", run_number, "persons_after_refinement.csv"))
     review = pd.DataFrame({
         'pop_refinement': refinement, 
         'before_refinement': hh.groupby('semmcd').sum()['persons'], 
         'after_refinement': new_hh.groupby('semmcd').sum()['persons']
     }).fillna(0).astype(int)
     review['diff'] = review['after_refinement'] - review['pop_refinement']
-    review.to_csv('/mnt/hgfs/urbansim/RDF2050/population_synthesis/historical/2015(2017)/092324_run_2015/pop_refinement_review.csv')
+    review.to_csv(os.path.join("output", run_number, "pop_refinement_review.csv"))
 
     return
     

@@ -154,7 +154,7 @@ def preprocess_buildings(buildings):
        'building_id', 'county', 'tract', 'bg', 
        'year_built', 'building_type_id', 'tax_per_units', 
        'res_sqft', 'residential_units', 'owner_units'
-    ]].to_csv('temp_for_placement/rust_test/HU.csv', index=False)
+    ]]
 
     data = data.reset_index()[[
         'building_id', 'county', 'mcd', 'tract', 'bg',
@@ -252,7 +252,7 @@ def generate_n_over18_for_hu(hu, voter):
     # pick the first one in this case
     first_pick_voter_hh = single_hu_merged.groupby('index').first()['p_over18']
     # cleaning
-    single_hu.loc[:, 'recode_p_over18'] = first_pick_voter_hh.fillna(0).astype(int)
+    hu_df.loc[single_hu.index, 'recode_p_over18'] = first_pick_voter_hh.fillna(0).astype(int)
     # pass the result back to the main table
     hu_df.loc[hu_df['hu_count'] == 1, :] = single_hu
 
@@ -551,7 +551,7 @@ def chunked_match(out, cant_match, con_l, syn_bg_count):
     new_cant_match_ind = list(set(new_cant_match_ind))
     return (out, cant_match.loc[new_cant_match_ind])
 
-def run_placement(households, buildings, voters_registration):
+def run_placement(households, buildings, voters_registration, run_number):
     ###
     skip_preprocess = False 
     if not skip_preprocess:
@@ -695,7 +695,7 @@ def run_placement(households, buildings, voters_registration):
              )
         )
         t_i = time.time()
-    cant_match.to_csv('test_run/092324_run_2015/cant_match_region.csv', index=False)
-    out.to_csv('test_run/092324_run_2015/match_result_region_temp.csv', index=False)
+    cant_match.to_csv(os.path.join('output', run_number, 'cant_match_region.csv'), index=False)
+    out.to_csv(os.path.join('output', run_number, 'match_result_region_temp.csv'), index=False)
     return out 
 

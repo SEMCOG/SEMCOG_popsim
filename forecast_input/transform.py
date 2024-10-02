@@ -225,7 +225,7 @@ def transform_hh(hh, p):
     ## transform hh's HRACE base on hh head race_id from persons table
     hh_head = p.loc[p["relate"] == 0, ["household_id", "race_id"]]
     hh_head_race_id = hh_head.set_index("household_id")["race_id"]
-    hh.loc[:, "HRACE"] = hh_head_race_id
+    hh["HRACE"] = hh_head_race_id
     hh_children = p.loc[p.age < 18].groupby("household_id").size()
     hh["children"] = 0
     hh.loc[hh_children.index, "children"] = hh_children
