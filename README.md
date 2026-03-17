@@ -5,9 +5,9 @@ SEMCOG population synthesis package based on [RSG PopulationSim](https://github.
 
 The repository is now organized around three layers:
 
-1. `src/semcog_popsim/` contains reusable package code for input preparation and PopulationSim execution.
+1. `src/semcog_popsim/` contains reusable package code.
 2. `scripts/` contains operational entrypoints.
-3. compatibility wrappers remain in the legacy locations where needed.
+3. compatibility wrappers remain in a few legacy locations where needed.
 
 Supporting notes are available in:
 - `docs/project_structure_review.md`
@@ -15,8 +15,6 @@ Supporting notes are available in:
 
 ---
 ## 1. Population Synthesis Preparation
-
-A major function of SEMCOG_popsim is to prepare input configuration and dataset for PopulationSim, including project settings, controls, demographic marginals and samples for target geographies, and a geographic cross walk table.
 
 ### Preferred entrypoint
 ```bash
@@ -40,40 +38,30 @@ python input_prep/popsim_input_maker.py <key> <yml>
 Legacy config locations under `input_prep/<year>/` still work during migration.
 
 ### Inputs
-- *controls_pre.csv*: an extended PopulationSim control file with an added `acs_variables` field used to download Census marginals and compile target control variables.
-- *prepare.yaml*: project/year-specific prep configuration, including PUMS locations, geography files, and PUMS variable updates.
-- *settings.yaml*: project/year-specific PopulationSim settings template.
-- *PUMS/*: household and person PUMS files for the region.
-- *projects/geo/*: shared geographic crosswalk and equivalency tables.
+- `projects/<year>/prepare.yaml`: prep configuration
+- `projects/<year>/settings.yaml`: year-specific PopulationSim settings template
+- `projects/<year>/controls_pre.csv`: control-prep table
+- `projects/geo/`: shared geographic crosswalk and equivalency tables
+- PUMS input files referenced by the prep config
 
 ### Outputs
-All outputs are still produced to `[year]/data` in the current migration stage.
-- *[region]\_[year]\_geo\_cross\_walk.csv*: crosswalk table for synthesis geographies.
-- *[region]\_[year]\_control\_totals\_[geo].csv*: control marginals by geography.
-- *[region]\_[year]\_seed\_households.csv*: seed households.
-- *[region]\_[year]\_seed\_persons.csv*: seed persons.
-- *[region]\_[year]\_settings.yaml*: run-ready settings file.
+At the current migration stage, prep outputs still land in `[year]/data` relative to the chosen project location.
+
+Typical outputs:
+- `[region]_[year]_geo_cross_walk.csv`
+- `[region]_[year]_control_totals_[geo].csv`
+- `[region]_[year]_seed_households.csv`
+- `[region]_[year]_seed_persons.csv`
+- `[region]_[year]_settings.yaml`
 
 ### Optional adjustments
-All marginal controls could be scaled to closer-to-reality totals. For example, 2019 5-year ACS block group controls can be adjusted to 2019 1-year ACS county totals.
-
-Adjustment config example:
+Adjustment workflow example:
 ```bash
 python input_prep/popsim_input_control_adj.py <key> projects/2019/control_adjustment.yaml
 ```
 
-### Migration note
-The migration now includes:
-- package-backed prep code in `src/semcog_popsim/input_prep/`
-- a package-backed run entrypoint in `src/semcog_popsim/pipeline/`
-- standardized project assets under `projects/<year>/`
-- shared prep geography assets under `projects/geo/`
-
-The original files under `input_prep/<year>/` are still present for backward compatibility.
-
 ---
 ## 2. Run Population Synthesis
-Both [PopulationSim](https://github.com/ActivitySim/populationsim) and [ActivitySim](https://github.com/ActivitySim/activitysim) are required for the synthesis process.
 
 Preferred runner:
 ```bash
@@ -87,40 +75,57 @@ python run_populationsim.py
 ```
 
 ### Runtime config layout
-The target runtime structure is being introduced in parallel with the legacy flat config directory.
+The target runtime structure now exists in parallel with the legacy flat config directory.
 
 Current migration state:
 - legacy active config files still exist directly under `configs/`
-- reusable config fragments are now mirrored under `configs/base/`
-- an example run-specific set now exists under `configs/runs/2020/`
+- reusable config fragments are mirrored under `configs/base/`
+- run-specific sets now exist for `configs/runs/2019/`, `configs/runs/2020/`, and `configs/runs/2022/`
+- `configs/runs/2022/` currently expects a prep-generated `controls.csv` to be staged before execution
 
-Input structure still used by the live workflow:
-- `configs/settings.yaml`: project settings
-- `configs/controls.csv` or the control file defined in `settings.yaml`
-- `data/xxx_geo_cross_walk.csv`
-- `data/xxx_control_totals.csv`
-- `data/xxx_seed_households.csv`
-- `data/xxx_seed_persons.csv`
+The active runtime still primarily uses the legacy flat `configs/` path, so `configs/runs/<year>/` should be treated as the preferred emerging layout rather than the sole enforced path until the canonical run flow is finalized.
 
-### Optional household size rebalance
-- `scripts/hh_size_balancer.py` uses a household size control file plus output summaries to create an adjusted control file.
-- Rerun PopulationSim with the updated controls as needed.
+Example 2020 command shape:
+```bash
+python scripts/run_popsim.py \
+  -c configs/runs/2020 \
+  -c configs/base \
+  -d data/2020_census_blkgrp \
+  -o outputs/2020 \
+  -s settings.yaml
+```
 
-### Results and visualization
-- The output folder contains synthesized households, persons, and one or more `summary_<geo>.csv` files.
-- `notebooks/output_stats_plots.ipynb` can be used to generate error plots and histograms.
+Notes:
+- earlier `-c` directories take precedence over later ones
+- `configs/runs/2022/` will also need a staged `controls.csv` before execution
 
 ---
-## 3. Forecast Refinement
-SEMCOG has also tested PopulationSim as a refinement tool for the UrbanSim model.
+## 3. Forecast Refinement And Placement
 
-`refinement/urbansim_refine_input.ipynb` prepares inputs for the refinement process.
+Shared logic for refinement and placement now lives under:
+- `src/semcog_popsim/forecast_refinement/`
 
-### Test inputs
-Similar inputs to population synthesis are expected:
-1. settings with manual updates
-2. controls compiled from annual household control totals from the forecast model
-3. geo crosswalks generated from model parcels and buildings
-4. control totals summarized from official SEMCOG forecasts or reviewed indicators
-5. seed households from model output households with weights and geographies
-6. seed persons from model output persons with weights and geographies
+Year-specific wrappers remain under `scripts/`:
+- `scripts/run_pop_refinement_2015.py`
+- `scripts/run_pop_refinement_2020.py`
+- `scripts/run_placement_2015.py`
+- `scripts/run_placement_2020.py`
+
+These scripts still use environment-specific file paths and should currently be treated as project-local operational wrappers rather than portable command-line tools.
+
+---
+## 4. Current Migration State
+
+Implemented so far:
+- package-backed prep code
+- package-backed PopulationSim run code
+- package-backed refinement and placement orchestration
+- `projects/<year>/` structure for year-specific assets
+- `configs/base/` and `configs/runs/` scaffolding
+- `archive/` for low-risk legacy material
+
+Still to finish:
+- full activation of run-specific configs as the default runtime path
+- validation packaging
+- broader cleanup of remaining legacy notebook-derived material
+- stricter separation of generated data into `data/raw`, `data/interim`, `data/processed`, and `outputs`

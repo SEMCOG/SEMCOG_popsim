@@ -2,85 +2,96 @@
 
 ## Summary
 
-The current repository already has the right high-level split:
+The repository now has a substantially improved structure compared with its original state.
 
-1. `input_prep/` prepares ACS controls, geography crosswalks, seed households/persons, and derived PopulationSim settings.
-2. `run_populationsim.py` runs the PopulationSim/ActivitySim synthesis once those prepared inputs are ready.
+The core workflow is clearly separated into:
 
-That separation of concerns is sound. The main structural issue is not the existence of two major scripts, but that the repository mixes source code, entrypoints, year-specific project assets, generated outputs, notebooks, and older experimental material in ways that make the workflow harder to maintain.
+1. package-backed prep code under `src/semcog_popsim/input_prep/`
+2. package-backed PopulationSim execution under `src/semcog_popsim/pipeline/`
+3. operational entrypoints under `scripts/`
+4. year-specific assets under `projects/`
+5. archived legacy material under `archive/`
+
+The original design idea was sound from the start: one phase prepares inputs and one phase runs synthesis. The main work has been turning that idea into a clearer repository structure and reducing the amount of duplicated, notebook-derived, and path-coupled code.
 
 ## Recommendation
 
 The two major scripts should not both live as full implementations in the project root.
 
-Recommended pattern:
+That recommendation has now largely been implemented in practice:
+- reusable logic lives under `src/semcog_popsim/`
+- thin operational entrypoints live under `scripts/`
+- legacy wrappers remain only for compatibility
 
-- Keep input-prep logic under `input_prep/` or a future package module such as `src/semcog_popsim/input_prep/`.
-- Keep run/entry scripts under a dedicated `scripts/` folder.
-- Keep the repository root for high-level documentation, stable wrappers, and project-wide assets such as `configs/`.
-
-For this repository, a practical near-term structure is:
+A practical current structure is now closer to:
 
 ```text
 SEMCOG_popsim/
   README.md
-  RunPopulationSim.bat
+  pyproject.toml
   docs/
   scripts/
-    run_populationsim.py
+    prepare_inputs.py
+    run_popsim.py
     run_pop_refinement_2015.py
     run_pop_refinement_2020.py
     run_placement_2015.py
     run_placement_2020.py
     hh_size_balancer.py
-  input_prep/
-    popsim_input_maker.py
-    popsim_input_control_adj.py
-    input_utils.py
-    geo/
+  src/semcog_popsim/
+    input_prep/
+    pipeline/
+    forecast_refinement/
+  projects/
     2017/
     2019/
     2020/
     2022/
+    geo/
   configs/
+    base/
+    runs/
+  data/
+  outputs/
+  archive/
   notebooks/
   refinement/
   validation/
 ```
 
-In a later cleanup, the year-specific inputs could move from `input_prep/<year>/` to something like `projects/<year>/`, and generated artifacts could be separated more clearly into `data/`, `outputs/`, or `interim/` locations.
+## What Improved
 
-## Why This Direction Helps
+- top-level operational runners were moved behind `scripts/`
+- input-prep code was packaged
+- PopulationSim run logic was packaged
+- project/year assets were copied into a clearer `projects/` layout
+- duplicated utility logic was reduced
+- legacy adjustment helpers were converted into valid scripts
+- refinement and placement runners now share package-backed logic
+- low-risk legacy materials were moved into `archive/`
 
-- It keeps the workflow understandable: `input_prep/` prepares, `scripts/` runs.
-- It reduces clutter at the repository root.
-- It makes room for future packaging without forcing a large refactor now.
-- It preserves compatibility by allowing lightweight wrappers to remain at the old top-level paths.
+## Remaining Gaps
 
-## Issues Noticed During Review
+The reorganization is substantial, but not finished.
 
-These are more important than folder naming alone:
+The biggest remaining gaps are:
+- the canonical runtime config flow still leans on legacy `configs/` files
+- the new `configs/runs/2019/`, `configs/runs/2020/`, and `configs/runs/2022/` directories still coexist with the legacy flat runtime config path
+- validation utilities are not yet packaged under `src/semcog_popsim/validation/`
+- some legacy notebook-derived material still remains visible in the active repo
+- many non-core scripts still use machine-specific file paths
 
-- `input_prep/popsim_input_maker.py` hardcodes a working directory with `os.chdir(...)`.
-- `input_prep/popsim_input_maker.py` defines a CLI `yaml` argument but currently loads a hardcoded `2022/prepare_2022.yaml`.
-- The repository contains duplicate or notebook-derived script logic, including `notebooks/popsim_input_maker.py`.
-- Top-level helper and run scripts are mixed together in the root even though they are all operational entrypoints.
-- `RunPopulationSim.bat` is environment-specific and references the root runner path directly.
+## Current Assessment
 
-## Improvements Recommended After This Reorganization
+The repository structure is now sound enough that future cleanup can focus less on “where files live” and more on “which path is canonical”.
 
-1. Refactor `popsim_input_maker.py` into functions with a `main()` entrypoint.
-2. Remove hardcoded paths and always resolve files relative to the script or supplied config.
-3. Consolidate duplicated notebook/script logic.
-4. Separate year/scenario assets from generated outputs more explicitly.
-5. Consider a future package layout such as `src/semcog_popsim/` if testability and reuse become priorities.
+In other words, the project has moved from structural ambiguity to structural transition. That is a good place to be.
 
-## Reorganization Applied
+## Best Next Step
 
-This reorganization focuses on low-risk structural cleanup:
+The highest-value next step is to make the run-side layout canonical, not just parallel.
 
-- Added this review under `docs/`.
-- Created `scripts/` for operational runners.
-- Moved top-level runner/helper implementations into `scripts/`.
-- Kept small root-level wrapper scripts so existing commands still work.
-- Updated the README and batch launcher to point at the new script locations.
+Specifically:
+1. document one canonical run recipe per supported year
+2. decide when `configs/runs/<year>/` becomes the only supported runtime layout
+3. keep legacy flat config paths only as transitional compatibility until that cutover
