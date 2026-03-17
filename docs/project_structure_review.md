@@ -68,6 +68,7 @@ SEMCOG_popsim/
 - duplicated utility logic was reduced
 - legacy adjustment helpers were converted into valid scripts
 - refinement and placement runners now share package-backed logic
+- legacy `forecast_input/` now acts as a compatibility shim for the packaged forecast helpers
 - low-risk legacy materials were moved into `archive/`
 
 ## Remaining Gaps

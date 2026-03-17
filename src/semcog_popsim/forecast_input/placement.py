@@ -4,6 +4,7 @@ import time
 import os
 import subprocess as sbp
 import math
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -13,9 +14,12 @@ from numba.typed import List
 
 from semcog_popsim.forecast_input.transform import calculate_housing_units_by_bg
 
-with open('configs/placement.yaml', 'r') as f:
+REPO_ROOT = Path(__file__).resolve().parents[3]
+CONFIG_DIR = REPO_ROOT / 'configs'
+
+with (CONFIG_DIR / 'placement.yaml').open('r') as f:
     placement_config = yaml.load(f, Loader=yaml.CLoader)
-with open('configs/mcd.yaml', 'r') as f:
+with (CONFIG_DIR / 'mcd.yaml').open('r') as f:
     mcd_mapping = yaml.load(f, Loader=yaml.CLoader)
 
 # get around the numba type checking

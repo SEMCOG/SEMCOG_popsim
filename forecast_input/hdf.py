@@ -1,10 +1,8 @@
-# hdf related functions/decorators 
-  
-def add_table(hdf, name):
-  def inner_decorator(f):
-    def wrapped(*args, **kwargs):
-      table = f(*args, **kwargs) 
-      table.to_hdf(hdf, name) 
-      return table 
-    return wrapped
-  return inner_decorator
+import sys
+from pathlib import Path
+
+SRC_DIR = Path(__file__).resolve().parent.parent / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+from semcog_popsim.forecast_input.hdf import *
