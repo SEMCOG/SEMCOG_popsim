@@ -1,4 +1,3 @@
-
 ::~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 :: Runs PopulationSim. User should specify the following
 :: 		- Local Anaconda installation directory
@@ -34,7 +33,7 @@ CD %ANACONDA_DIR%\envs\popsim\Scripts
 CALL %CONDA_ACT% popsim
 CD %BATCH_DIR%
 
-%PYTHON% run_populationsim.py
+%PYTHON% scripts\run_populationsim.py
 
 CD %ANACONDA_DIR%\envs\popsim\Scripts
 CALL %CONDA_DEA%
