@@ -21,7 +21,7 @@ The two major scripts should not both live as full implementations in the projec
 That recommendation has now largely been implemented in practice:
 - reusable logic lives under `src/semcog_popsim/`
 - thin operational entrypoints live under `scripts/`
-- legacy wrappers remain only for compatibility
+- legacy root-level wrappers remain only for compatibility and no longer carry primary implementation logic
 
 A practical current structure is now closer to:
 
@@ -62,6 +62,7 @@ SEMCOG_popsim/
 ## What Improved
 
 - top-level operational runners were moved behind `scripts/`
+- the remaining root-level runner files are explicitly compatibility-only
 - input-prep code was packaged
 - PopulationSim run logic was packaged
 - project/year assets were copied into a clearer `projects/` layout

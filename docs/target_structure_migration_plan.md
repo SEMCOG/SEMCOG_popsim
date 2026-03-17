@@ -57,7 +57,7 @@ The intent is to separate:
 - package-backed PopulationSim run entrypoint added under `src/semcog_popsim/pipeline/`
 - packaged runner now owns its own standard CLI parsing instead of depending on ActivitySim's fragile CLI import path
 - `scripts/prepare_inputs.py` and `scripts/run_popsim.py` added
-- compatibility wrappers retained for legacy entrypoints
+- compatibility wrappers retained for legacy entrypoints, with `scripts/` established as the canonical launcher surface
 - year-specific project assets copied into `projects/<year>/`
 - shared geography crosswalks copied into `projects/geo/`
 - `configs/base/` plus run-specific sets for 2019, 2020, and 2022 created as parallel target structure

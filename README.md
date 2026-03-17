@@ -7,7 +7,7 @@ The repository is now organized around three layers:
 
 1. `src/semcog_popsim/` contains reusable package code.
 2. `scripts/` contains operational entrypoints.
-3. compatibility wrappers remain in a few legacy locations where needed.
+3. compatibility wrappers remain in a few legacy locations where needed, but `scripts/` is the canonical entrypoint surface.
 
 Supporting notes are available in:
 - `docs/project_structure_review.md`
@@ -74,6 +74,8 @@ Compatibility runners:
 python scripts/run_populationsim.py
 python run_populationsim.py
 ```
+
+The root-level runner files are compatibility wrappers only; use the `scripts/` versions for new work.
 
 ### Runtime config layout
 The target runtime structure now exists in parallel with the legacy flat config directory.
