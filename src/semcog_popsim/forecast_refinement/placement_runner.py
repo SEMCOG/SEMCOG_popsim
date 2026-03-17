@@ -2,9 +2,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from forecast_input.input import load_pop_synthetic_csv
-from forecast_input.placement import run_placement
-from forecast_input.transform import (
+from semcog_popsim.forecast_input.input import load_pop_synthetic_csv
+from semcog_popsim.forecast_input.placement import run_placement
+from semcog_popsim.forecast_input.transform import (
     calculate_improvement_values,
     households_add_n_18plus,
     transform_buildings,

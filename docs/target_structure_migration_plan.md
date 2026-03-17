@@ -65,6 +65,7 @@ The intent is to separate:
 - duplicated `input_utils` logic replaced with a compatibility shim
 - forecast refinement runner logic packaged under `src/semcog_popsim/forecast_refinement/`
 - placement runner logic packaged under `src/semcog_popsim/forecast_refinement/`
+- reusable forecast-input helpers packaged under `src/semcog_popsim/forecast_input/`
 - two legacy adjustment helpers converted from notebook-style code into valid standalone scripts
 
 ### Still incomplete

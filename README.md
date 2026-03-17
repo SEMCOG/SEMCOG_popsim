@@ -129,6 +129,7 @@ Implemented so far:
 - package-backed prep code
 - package-backed PopulationSim run code
 - package-backed refinement and placement orchestration
+- packaged forecast-input helpers under `src/semcog_popsim/forecast_input/`
 - `projects/<year>/` structure for year-specific assets
 - `configs/base/` and `configs/runs/` scaffolding
 - `archive/` for low-risk legacy material

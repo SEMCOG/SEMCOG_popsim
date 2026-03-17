@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from forecast_input.pop_refinement import refine_pop_single_year
+from semcog_popsim.forecast_input.pop_refinement import refine_pop_single_year
 
 
 def run_population_refinement(
