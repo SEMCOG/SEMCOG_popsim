@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+from pathlib import Path
 
 from activitysim.core import config
 from activitysim.core import inject
@@ -13,7 +14,19 @@ logger = logging.getLogger("populationsim")
 INJECTABLES = ["data_dir", "configs_dir", "output_dir", "settings_file_name"]
 
 
+def repo_root():
+    return Path(__file__).resolve().parents[3]
+
+
 def add_run_args(parser, multiprocess=True):
+    parser.add_argument(
+        "--run-config",
+        "--year",
+        dest="run_config",
+        type=str,
+        metavar="NAME",
+        help="use configs/runs/<name> plus configs/base",
+    )
     parser.add_argument("-w", "--working_dir", type=str, metavar="PATH", help="path to project directory")
     parser.add_argument("-c", "--config", type=str, action="append", metavar="PATH", help="path to config dir")
     parser.add_argument("-o", "--output", type=str, metavar="PATH", help="path to output dir")
@@ -34,6 +47,26 @@ def add_run_args(parser, multiprocess=True):
             type=int,
             help="run multiprocess and optionally override the process count",
         )
+
+
+def resolve_run_defaults(args):
+    if not args.run_config:
+        return args
+
+    root = repo_root()
+    run_config_dir = root / "configs" / "runs" / str(args.run_config)
+    base_config = root / "configs" / "base"
+
+    if not args.config:
+        args.config = [str(run_config_dir), str(base_config)]
+
+    if not args.settings_file:
+        args.settings_file = "settings.yaml"
+
+    if not args.output:
+        args.output = str(root / "outputs" / str(args.run_config))
+
+    return args
 
 
 def validate_injectable(name):
@@ -72,6 +105,7 @@ def handle_standard_args(args, multiprocess=True):
         inject_arg("data_dir", args.data)
 
     if args.output:
+        Path(args.output).mkdir(parents=True, exist_ok=True)
         inject_arg("output_dir", args.output)
 
     if multiprocess and args.multiprocess:
@@ -105,6 +139,7 @@ def run_pipeline(argv=None):
     parser = argparse.ArgumentParser(description="Run SEMCOG PopulationSim")
     add_run_args(parser)
     args = parser.parse_args(argv)
+    args = resolve_run_defaults(args)
 
     handle_standard_args(args)
     tracing.config_logger()
