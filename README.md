@@ -22,12 +22,13 @@ python scripts/prepare_inputs.py <key> <yml>
 ```
 
 Preferred config location:
-- `projects/<year>/prepare.yaml`
+- `projects/<name>/prepare.yaml`
 
 Examples:
 ```bash
 python scripts/prepare_inputs.py <key> projects/2019/prepare.yaml
 python scripts/prepare_inputs.py <key> projects/2022/prepare.yaml
+python scripts/prepare_inputs.py <key> projects/baseline_a/prepare.yaml --output-dir data/interim/baseline_a
 ```
 
 Legacy compatibility entrypoint:
@@ -38,14 +39,14 @@ python input_prep/popsim_input_maker.py <key> <yml>
 Legacy config locations under `input_prep/<year>/` still work during migration.
 
 ### Inputs
-- `projects/<year>/prepare.yaml`: prep configuration
-- `projects/<year>/settings.yaml`: year-specific PopulationSim settings template
-- `projects/<year>/controls_pre.csv`: control-prep table
+- `projects/<name>/prepare.yaml`: prep configuration
+- `projects/<name>/settings.yaml`: project-specific PopulationSim settings template
+- `projects/<name>/controls_pre.csv`: control-prep table
 - `projects/geo/`: shared geographic crosswalk and equivalency tables
 - PUMS input files referenced by the prep config
 
 ### Outputs
-At the current migration stage, prep outputs still land in `[year]/data` relative to the chosen project location.
+At the current migration stage, prep outputs land in `data/` relative to the chosen project folder by default, or in `--output-dir` when explicitly provided.
 
 Typical outputs:
 - `[region]_[year]_geo_cross_walk.csv`

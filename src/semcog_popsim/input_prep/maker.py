@@ -44,10 +44,11 @@ def _load_yaml(path):
         return yaml.load(stream, Loader=yaml.FullLoader)
 
 
-def _resolve_base_dir(config_path):
-    if config_path.parent.name.isdigit():
-        return config_path.parent.parent
-    return config_path.parent
+def _resolve_repo_root(config_path):
+    for candidate in [config_path.parent, *config_path.parents]:
+        if (candidate / "pyproject.toml").exists():
+            return candidate
+    return config_path.parent.parent
 
 
 def _resolve_path(path_value, base_dir, repo_root):
@@ -61,9 +62,9 @@ def _resolve_path(path_value, base_dir, repo_root):
     return (base_dir / candidate).resolve()
 
 
-def _resolve_geo_dir(base_dir, repo_root):
+def _resolve_geo_dir(project_dir, repo_root):
     candidates = [
-        base_dir / "geo",
+        project_dir / "geo",
         repo_root / "projects" / "geo",
         repo_root / "input_prep" / "geo",
     ]
@@ -80,11 +81,11 @@ def _find_puma_definition(acs_year):
     raise ValueError(f"No PUMA crosswalk mapping defined for ACS year {acs_year}")
 
 
-def run_input_prep(api_key, config_path):
+def run_input_prep(api_key, config_path, output_dir=None):
     config_path = Path(config_path).resolve()
-    base_dir = _resolve_base_dir(config_path)
-    repo_root = base_dir.parent
-    geo_dir = _resolve_geo_dir(base_dir, repo_root)
+    project_dir = config_path.parent
+    repo_root = _resolve_repo_root(config_path)
+    geo_dir = _resolve_geo_dir(project_dir, repo_root)
     conf = _load_yaml(config_path)
     start = time.time()
 
@@ -93,17 +94,20 @@ def run_input_prep(api_key, config_path):
     target = project["target"]
     acs_year = project["acs_year"]
     acs_sample = project["acs_sample"]
-    project_folder = base_dir / str(acs_year)
-    settings_file = _resolve_path(project["settings"].format(str(acs_year)), project_folder, repo_root)
-    pre_control = _resolve_path(project["pre_control"].format(str(acs_year)), project_folder, repo_root)
-    household_pums_csv = _resolve_path(project["h_pums_csv"], base_dir, repo_root)
-    person_pums_csv = _resolve_path(project["p_pums_csv"], base_dir, repo_root)
+    settings_file = _resolve_path(project["settings"].format(str(acs_year)), project_dir, repo_root)
+    pre_control = _resolve_path(project["pre_control"].format(str(acs_year)), project_dir, repo_root)
+    household_pums_csv = _resolve_path(project["h_pums_csv"], project_dir, repo_root)
+    person_pums_csv = _resolve_path(project["p_pums_csv"], project_dir, repo_root)
 
     geography = conf["geography"]
     state = geography["state"][0]
     counties = geography["counties"]
 
-    output_folder = project_folder / "data"
+    configured_output_dir = output_dir or project.get("output_dir")
+    if configured_output_dir:
+        output_folder = _resolve_path(configured_output_dir.format(str(acs_year)), project_dir, repo_root)
+    else:
+        output_folder = project_dir / "data"
     output_folder.mkdir(parents=True, exist_ok=True)
     output_geo_cross = f"{project_name}_{acs_year}_geo_cross_walk.csv"
     output_control = f"{project_name}_{acs_year}_control_totals_.csv"
@@ -252,30 +256,27 @@ def run_input_prep(api_key, config_path):
     settings_output = output_folder / f"{project_name}_{acs_year}_settings.yaml"
     with settings_output.open("w") as yaml_file:
         yaml.dump(project_settings, yaml_file, default_style=None, default_flow_style=False, sort_keys=False)
-
     print("copy popsim master control file")
     shutil.copy(pre_control, output_folder / f"{project_name}_{acs_year}_controls.csv")
     print(
         f"\ntotal time: {round(time.time() - start, 1)} seconds",
         f"\nDone. All files are saved to {output_folder}",
-        '\nTo run Populationsim:',
-        '\n\t copy new settings and controls to configs folder and rename "xxx_settings.yaml" to "settings.yaml"',
-        f"\n\t copy other files in {acs_year}/data folder to data/{acs_year}/",
+        "\nNext step:",
+        "\n\tuse the generated controls/settings with a matching configs/runs/<name>/ folder",
+        "\n\tand point the runner at the data folder that contains these outputs.",
     )
-
-
-
 def build_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("key", help="Census API key")
     parser.add_argument("yaml", help="yaml configuration file name")
+    parser.add_argument("--output-dir", help="optional output directory override")
     return parser
 
 
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
-    run_input_prep(args.key, args.yaml)
+    run_input_prep(args.key, args.yaml, output_dir=args.output_dir)
 
 
 if __name__ == "__main__":

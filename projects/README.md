@@ -9,3 +9,7 @@ Current conventions:
 - `projects/geo/` holds shared geography crosswalk files used by multiple project years.
 
 The original files under `input_prep/<year>/` are still present for backward compatibility during migration.
+
+Additional notes:
+- project folder names do not need to be numeric years; the packaged prep flow now resolves files relative to the config folder itself.
+- `python scripts/prepare_inputs.py <key> <yaml> --output-dir <path>` can be used when you want outputs somewhere other than the default local `data/` folder.
