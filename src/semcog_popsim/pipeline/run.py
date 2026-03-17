@@ -30,6 +30,7 @@ def add_run_args(parser, multiprocess=True):
     parser.add_argument("-w", "--working_dir", type=str, metavar="PATH", help="path to project directory")
     parser.add_argument("-c", "--config", type=str, action="append", metavar="PATH", help="path to config dir")
     parser.add_argument("-o", "--output", type=str, metavar="PATH", help="path to output dir")
+    parser.add_argument("--data-root", type=str, metavar="PATH", help="base directory for run data folders")
     parser.add_argument("-d", "--data", type=str, action="append", metavar="PATH", help="path to data dir")
     parser.add_argument("-r", "--resume", type=str, metavar="STEPNAME", help="resume after step")
     parser.add_argument("-p", "--pipeline", type=str, metavar="FILE", help="pipeline file name")
@@ -63,8 +64,12 @@ def resolve_run_defaults(args):
     if not args.settings_file:
         args.settings_file = "settings.yaml"
 
+    if not args.data:
+        data_root = Path(args.data_root) if args.data_root else root / "data"
+        args.data = [str((data_root / str(args.run_config)).resolve())]
+
     if not args.output:
-        args.output = str(root / "outputs" / str(args.run_config))
+        args.output = str((root / "outputs" / str(args.run_config)).resolve())
 
     return args
 

@@ -29,6 +29,7 @@ Examples:
 python scripts/prepare_inputs.py <key> projects/2019/prepare.yaml
 python scripts/prepare_inputs.py <key> projects/2022/prepare.yaml
 python scripts/prepare_inputs.py <key> projects/baseline_a/prepare.yaml --output-dir data/interim/baseline_a
+python scripts/prepare_inputs.py <key> projects/baseline_a/prepare.yaml --data-root /path/to/shared_data
 ```
 
 Legacy compatibility entrypoint:
@@ -46,7 +47,7 @@ Legacy config locations under `input_prep/<year>/` still work during migration.
 - PUMS input files referenced by the prep config
 
 ### Outputs
-At the current migration stage, prep outputs land in `data/` relative to the chosen project folder by default, or in `--output-dir` when explicitly provided.
+At the current migration stage, prep outputs land in `data/` relative to the chosen project folder by default, or can be redirected with `--output-dir` or `--data-root`.
 
 Typical outputs:
 - `[region]_[year]_geo_cross_walk.csv`
@@ -92,6 +93,7 @@ The active runtime still primarily uses the legacy flat `configs/` path, so `con
 Preferred generic command shape:
 ```bash
 python scripts/run_popsim.py --run-config 2020 -d data/2020_census_blkgrp
+python scripts/run_popsim.py --run-config 2020 --data-root /path/to/shared_data
 ```
 
 Override example:
@@ -104,6 +106,7 @@ python scripts/run_popsim.py \
 
 Notes:
 - `--run-config <name>` automatically uses `configs/runs/<name>/` and `configs/base/`
+- the default data folder becomes `<data-root>/<name>` when `--run-config` is used without `-d`
 - the default output folder becomes `outputs/<name>` when `--run-config` is used
 - you can add a future `configs/runs/scenario_x/` and run it through the same entrypoint
 - if you pass explicit `-c` values, those are used instead of the run-config defaults

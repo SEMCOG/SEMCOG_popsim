@@ -12,4 +12,5 @@ The original files under `input_prep/<year>/` are still present for backward com
 
 Additional notes:
 - project folder names do not need to be numeric years; the packaged prep flow now resolves files relative to the config folder itself.
-- `python scripts/prepare_inputs.py <key> <yaml> --output-dir <path>` can be used when you want outputs somewhere other than the default local `data/` folder.
+- `python scripts/prepare_inputs.py <key> <yaml> --output-dir <path>` can be used when you want a fully explicit output location.
+- `python scripts/prepare_inputs.py <key> <yaml> --data-root <path>` can be used when you want outputs grouped under a shared external data folder.

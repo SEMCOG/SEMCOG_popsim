@@ -81,7 +81,7 @@ def _find_puma_definition(acs_year):
     raise ValueError(f"No PUMA crosswalk mapping defined for ACS year {acs_year}")
 
 
-def run_input_prep(api_key, config_path, output_dir=None):
+def run_input_prep(api_key, config_path, output_dir=None, data_root=None):
     config_path = Path(config_path).resolve()
     project_dir = config_path.parent
     repo_root = _resolve_repo_root(config_path)
@@ -106,6 +106,8 @@ def run_input_prep(api_key, config_path, output_dir=None):
     configured_output_dir = output_dir or project.get("output_dir")
     if configured_output_dir:
         output_folder = _resolve_path(configured_output_dir.format(str(acs_year)), project_dir, repo_root)
+    elif data_root:
+        output_folder = (Path(data_root).expanduser().resolve() / project_dir.name)
     else:
         output_folder = project_dir / "data"
     output_folder.mkdir(parents=True, exist_ok=True)
@@ -270,13 +272,14 @@ def build_parser():
     parser.add_argument("key", help="Census API key")
     parser.add_argument("yaml", help="yaml configuration file name")
     parser.add_argument("--output-dir", help="optional output directory override")
+    parser.add_argument("--data-root", help="optional base directory for prep outputs")
     return parser
 
 
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
-    run_input_prep(args.key, args.yaml, output_dir=args.output_dir)
+    run_input_prep(args.key, args.yaml, output_dir=args.output_dir, data_root=args.data_root)
 
 
 if __name__ == "__main__":
