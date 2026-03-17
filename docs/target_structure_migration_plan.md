@@ -70,7 +70,7 @@ The intent is to separate:
 ### Still incomplete
 
 - the canonical runtime flow still depends on the legacy flat `configs/` layout
-- `configs/runs/2019/`, `configs/runs/2020/`, and `configs/runs/2022/` now exist, but the runtime still leans on the legacy flat `configs/` path
+- `configs/runs/<name>/` now exists as the reusable target pattern, but the runtime still leans on the legacy flat `configs/` path in some workflows
 - generated outputs still primarily land in legacy year/data locations rather than a fully enforced `data/raw|interim|processed` flow
 - validation helpers have not yet been packaged into `src/semcog_popsim/validation/`
 - several notebooks and legacy helper files still remain outside `archive/`
@@ -94,9 +94,10 @@ The remaining work is less about initial structure creation and more about conso
 Goal: move from “parallel target structure exists” to “target structure is the preferred operational path”.
 
 Recommended tasks:
-- document one canonical run recipe per supported year
-- decide whether `configs/settings.yaml` remains a compatibility artifact or becomes generated from `configs/runs/<year>/`
-- decide when `configs/runs/<year>/controls.csv` is required to be present before execution
+- document the generic `--run-config <name>` recipe
+- decide whether `configs/settings.yaml` remains a compatibility artifact or becomes generated from `configs/runs/<name>/`
+- decide when `configs/runs/<name>/controls.csv` is required to be present before execution
+- keep the runner generic so new `configs/runs/<name>/` folders work without code changes
 
 Why this matters:
 - the prep side now has a usable `projects/` structure, but the run side still primarily points to the legacy flat config layout
@@ -199,8 +200,8 @@ Remaining:
 
 Recommended next order:
 
-1. define and document one canonical end-to-end run flow
-2. decide how prep-generated controls are staged into `configs/runs/<year>/`
+1. define and document one canonical generic run flow
+2. decide how prep-generated controls are staged into `configs/runs/<name>/`
 3. package validation helpers that are truly reusable
 4. continue selective archive cleanup
 
@@ -216,6 +217,6 @@ The migration will feel operationally complete when:
 
 ## Suggested Immediate Next Step
 
-Document one canonical run recipe in the README for each supported year, then decide how prep-generated control files should be staged into `configs/runs/<year>/` before execution.
+Document the generic `--run-config <name>` recipe in the README, then decide how prep-generated control files should be staged into `configs/runs/<name>/` before execution.
 
 That is the most valuable next step because the structural scaffolding now exists and the remaining work is mostly about making the run path explicit and repeatable.

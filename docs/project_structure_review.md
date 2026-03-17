@@ -76,7 +76,7 @@ The reorganization is substantial, but not finished.
 
 The biggest remaining gaps are:
 - the canonical runtime config flow still leans on legacy `configs/` files
-- the new `configs/runs/2019/`, `configs/runs/2020/`, and `configs/runs/2022/` directories still coexist with the legacy flat runtime config path
+- the new `configs/runs/<name>/` directories still coexist with the legacy flat runtime config path
 - validation utilities are not yet packaged under `src/semcog_popsim/validation/`
 - some legacy notebook-derived material still remains visible in the active repo
 - many non-core scripts still use machine-specific file paths
@@ -92,6 +92,6 @@ In other words, the project has moved from structural ambiguity to structural tr
 The highest-value next step is to make the run-side layout canonical, not just parallel.
 
 Specifically:
-1. document one canonical run recipe per supported year
-2. decide when `configs/runs/<year>/` becomes the only supported runtime layout
+1. document the generic `--run-config <name>` recipe
+2. decide when `configs/runs/<name>/` becomes the only supported runtime layout
 3. keep legacy flat config paths only as transitional compatibility until that cutover

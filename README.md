@@ -65,7 +65,7 @@ python input_prep/popsim_input_control_adj.py <key> projects/2019/control_adjust
 
 Preferred runner:
 ```bash
-python scripts/run_popsim.py
+python scripts/run_popsim.py --run-config <name> -d <data_dir>
 ```
 
 Compatibility runners:
@@ -81,23 +81,31 @@ Current migration state:
 - legacy active config files still exist directly under `configs/`
 - reusable config fragments are mirrored under `configs/base/`
 - run-specific sets now exist for `configs/runs/2019/`, `configs/runs/2020/`, and `configs/runs/2022/`
+- the runner can resolve `configs/runs/<name>/` plus `configs/base/` automatically with `--run-config <name>`
 - `configs/runs/2022/` currently expects a prep-generated `controls.csv` to be staged before execution
 
-The active runtime still primarily uses the legacy flat `configs/` path, so `configs/runs/<year>/` should be treated as the preferred emerging layout rather than the sole enforced path until the canonical run flow is finalized.
+The active runtime still primarily uses the legacy flat `configs/` path, so `configs/runs/<name>/` should be treated as the preferred emerging layout rather than the sole enforced path until the canonical run flow is finalized.
 
-Example 2020 command shape:
+Preferred generic command shape:
+```bash
+python scripts/run_popsim.py --run-config 2020 -d data/2020_census_blkgrp
+```
+
+Override example:
 ```bash
 python scripts/run_popsim.py \
-  -c configs/runs/2020 \
-  -c configs/base \
-  -d data/2020_census_blkgrp \
-  -o outputs/2020 \
-  -s settings.yaml
+  --run-config baseline_a \
+  -d data/baseline_a \
+  -o outputs/baseline_a_custom
 ```
 
 Notes:
-- earlier `-c` directories take precedence over later ones
-- `configs/runs/2022/` will also need a staged `controls.csv` before execution
+- `--run-config <name>` automatically uses `configs/runs/<name>/` and `configs/base/`
+- the default output folder becomes `outputs/<name>` when `--run-config` is used
+- you can add a future `configs/runs/scenario_x/` and run it through the same entrypoint
+- if you pass explicit `-c` values, those are used instead of the run-config defaults
+- `--year <name>` is still accepted as a compatibility alias
+- `configs/runs/2022/` will still need a staged `controls.csv` before execution
 
 ---
 ## 3. Forecast Refinement And Placement
