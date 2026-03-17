@@ -61,6 +61,18 @@ def _resolve_path(path_value, base_dir, repo_root):
     return (base_dir / candidate).resolve()
 
 
+def _resolve_geo_dir(base_dir, repo_root):
+    candidates = [
+        base_dir / "geo",
+        repo_root / "projects" / "geo",
+        repo_root / "input_prep" / "geo",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[0]
+
+
 def _find_puma_definition(acs_year):
     for years, definitions in ACS_PUMA_MAP.items():
         if acs_year in years:
@@ -72,7 +84,7 @@ def run_input_prep(api_key, config_path):
     config_path = Path(config_path).resolve()
     base_dir = _resolve_base_dir(config_path)
     repo_root = base_dir.parent
-    geo_dir = base_dir / "geo"
+    geo_dir = _resolve_geo_dir(base_dir, repo_root)
     conf = _load_yaml(config_path)
     start = time.time()
 
@@ -252,11 +264,13 @@ def run_input_prep(api_key, config_path):
     )
 
 
+
 def build_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("key", help="Census API key")
     parser.add_argument("yaml", help="yaml configuration file name")
     return parser
+
 
 
 def main(argv=None):

@@ -1,0 +1,62 @@
+target,geography,seed_table,importance,control_field,expression,acs_variables
+num_hh,BLKGRP,households,1000000000,HHBASE,(households.WGTP > 0) & (households.WGTP < np.inf),B25002_002E
+hh_age_15_24,BLKGRP,households,500,HHAGE1,(households.AGEHOH <= 24),B19037_002E
+hh_age_25_44,BLKGRP,households,500,HHAGE2,(households.AGEHOH > 24) & (households.AGEHOH <= 44),B19037_019E
+hh_age_45_64,BLKGRP,households,500,HHAGE3,(households.AGEHOH > 44) & (households.AGEHOH <= 64),B19037_036E
+hh_age_65_plus,BLKGRP,households,500,HHAGE4,(households.AGEHOH > 64) & (households.AGEHOH <= np.inf),B19037_053E
+hh_race_white,BLKGRP,households,500,HHRACE1,(households.HRACE == 1),B25006_002E
+hh_race_black,BLKGRP,households,500,HHRACE2,(households.HRACE == 2),B25006_003E
+hh_race_asian,BLKGRP,households,500,HHRACE3,(households.HRACE == 3),B25006_005E
+hh_race_other,BLKGRP,households,500,HHRACE4,(households.HRACE == 4),B25006_004E + B25006_006E + B25006_007E + B25006_008E
+hh_hisp_not,BLKGRP,households,500,HHHISP1,(households.HHISP == 0),B11005_001E - B25003I_001E
+hh_hisp,BLKGRP,households,500,HHHISP2,(households.HHISP == 1),B25003I_001E
+hh_children,BLKGRP,households,5000,HHCHD1,(households.R18 == 1),B11005_002E
+hh_children_not,BLKGRP,households,5000,HHCHD2,(households.R18 != 1),B11005_011E
+hh_inc_30,BLKGRP,households,500,HHINC1,(households.income > -999999999) & (households.income <= 30000),B19001_002E + B19001_003E + B19001_004E + B19001_005E + B19001_006E
+hh_inc_30_60,BLKGRP,households,500,HHINC2,(households.income >30000) & (households.income <= 60000),B19001_007E + B19001_008E + B19001_009E + B19001_010E + B19001_011E
+hh_inc_60_100,BLKGRP,households,500,HHINC3,(households.income > 60000) & (households.income <= 100000),B19001_012E + B19001_013E
+hh_inc_100_plus,BLKGRP,households,500,HHINC4,(households.income > 100000),B19001_014E + B19001_015E + B19001_016E + B19001_017E
+hh_cars_0,BLKGRP,households,500,HHCAR0,(households.VEH == 0),B25044_003E + B25044_010E
+hh_cars_1,BLKGRP,households,500,HHCAR1,(households.VEH == 1),B25044_004E + B25044_011E
+hh_cars_2,BLKGRP,households,500,HHCAR2,(households.VEH >= 2),B25044_005E + B25044_006E + B25044_007E + B25044_008E + B25044_012E + B25044_013E + B25044_014E + B25044_015E
+hh_workers_0,TRACT,households,500,HHWORKER0,(households.HWORKERS == 0),B08202_002E
+hh_workers_1,TRACT,households,500,HHWORKER1,(households.HWORKERS == 1),B08202_003E
+hh_workers_2,TRACT,households,500,HHWORKER2,(households.HWORKERS >= 2),B08202_004E + B08202_005E
+hh_persons_1,BLKGRP,households,5000,HHPERSONS1,(households.NP == 1),B25009_003E + B25009_011E
+hh_persons_2,BLKGRP,households,500,HHPERSONS2,(households.NP == 2),B25009_004E + B25009_012E
+hh_persons_3,BLKGRP,households,500,HHPERSONS3,(households.NP == 3),B25009_005E + B25009_013E
+hh_persons_4,BLKGRP,households,500,HHPERSONS4,(households.NP == 4),B25009_006E + B25009_014E
+hh_persons_5,BLKGRP,households,500,HHPERSONS5,(households.NP == 5),B25009_007E + B25009_015E
+hh_persons_6,BLKGRP,households,500,HHPERSONS6,(households.NP == 6),B25009_008E + B25009_016E
+hh_persons_7,BLKGRP,households,500,HHPERSONS7,(households.NP >= 7),B25009_009E + B25009_017E
+hh_tenure_1,BLKGRP,households,500,HHTENURE1,(households.TEN <=2),B25038_002E
+hh_tenure_0,BLKGRP,households,500,HHTENURE0,(households.TEN>2),B25038_009E
+persons_num,BLKGRP,persons,100000000,POPBASE,(persons.PWGTP>0) & (persons.PWGTP< np.inf),(B01001_002E + B01001_026E) * B11002_001E*1.0/B01001_001E
+persons_age_4,BLKGRP,persons,2000,AGEP1,(persons.AGEP <= 4),(B01001_003E  + B01001_027E )* B11002_001E*1.0/B01001_001E
+persons_age_17,BLKGRP,persons,2000,AGEP2,(persons.AGEP >= 5) & (persons.AGEP <= 17),(B01001_004E + B01001_005E + B01001_006E + B01001_028E + B01001_029E + B01001_030E)* B11002_001E*1.0/B01001_001E
+persons_age_18_24,BLKGRP,persons,2000,AGEP3,(persons.AGEP >= 18) & (persons.AGEP <= 24),(B01001_007E + B01001_008E + B01001_009E + B01001_010E +  B01001_031E + B01001_032E + B01001_033E + B01001_034E)* B11002_001E*1.0/B01001_001E
+persons_age_25_34,BLKGRP,persons,2000,AGEP4,(persons.AGEP >= 25) & (persons.AGEP <= 34),(B01001_011E + B01001_012E + B01001_035E + B01001_036E )* B11002_001E*1.0/B01001_001E
+persons_age_35_64,BLKGRP,persons,2000,AGEP5,(persons.AGEP >= 35) & (persons.AGEP <=64),(B01001_013E + B01001_014E + B01001_015E + B01001_016E + B01001_017E + B01001_018E + B01001_019E + B01001_037E + B01001_038E + B01001_039E  + B01001_040E + B01001_041E + B01001_042E + B01001_043E )* B11002_001E*1.0/B01001_001E
+persons_age_65,BLKGRP,persons,1000,AGEP6,"(persons.AGEP >= 65) ",(B01001_020E + B01001_021E + B01001_022E + B01001_023E + B01001_024E + B01001_025E + B01001_044E + B01001_045E + B01001_046E + B01001_047E + B01001_048E + B01001_049E) * B11002_001E*1.0/B01001_001E
+persons_race_white,BLKGRP,persons,1000,RACE1,(persons.RAC1P == 1) & (persons.HISP == 1),(B03002_003E) * B11002_001E*1.0/B01001_001E
+persons_race_black,BLKGRP,persons,1000,RACE2,(persons.RAC1P == 2) & (persons.HISP == 1),(B03002_004E) * B11002_001E*1.0/B01001_001E
+persons_race_asian,BLKGRP,persons,1000,RACE3,(persons.RAC1P == 6) & (persons.HISP == 1),(B03002_006E) * B11002_001E*1.0/B01001_001E
+persons_race_other,BLKGRP,persons,1000,RACE4,"(persons.RAC1P.isin([3,5,7,8,9])) & (persons.HISP == 1)",(B03002_005E +  B03002_007E + B03002_008E + B03002_009E ) * B11002_001E*1.0/B01001_001E
+persons_race_hisp,BLKGRP,persons,1000,RACE5,(persons.HISP > 1),(B03002_012E) * B11002_001E*1.0/B01001_001E
+persons_sex_male,BLKGRP,persons,1000,SEX1,(persons.SEX == 1),(B01001_002E) * B11002_001E*1.0/B01001_001E
+persons_sex_fmale,BLKGRP,persons,1000,SEX2,(persons.SEX == 2),(B01001_026E ) * B11002_001E*1.0/B01001_001E
+Persons_industry_1,TRACT,persons,1000,INDUSTRY1,(persons.industry == 1),B08126_002E * B11002_001E*1.0/B01001_001E
+Persons_industry_2,TRACT,persons,1000,INDUSTRY2,(persons.industry == 2),B08126_003E * B11002_001E*1.0/B01001_001E
+Persons_industry_3,TRACT,persons,1000,INDUSTRY3,(persons.industry == 3),B08126_004E * B11002_001E*1.0/B01001_001E
+Persons_industry_4,TRACT,persons,1000,INDUSTRY4,(persons.industry == 4),B08126_005E  * B11002_001E*1.0/B01001_001E
+Persons_industry_5,TRACT,persons,1000,INDUSTRY5,(persons.industry == 5),B08126_006E  * B11002_001E*1.0/B01001_001E
+Persons_industry_6,TRACT,persons,1000,INDUSTRY6,(persons.industry == 6),B08126_007E * B11002_001E*1.0/B01001_001E
+Persons_industry_7,TRACT,persons,1000,INDUSTRY7,(persons.industry == 7),B08126_008E  * B11002_001E*1.0/B01001_001E
+Persons_industry_8,TRACT,persons,1000,INDUSTRY8,(persons.industry == 8),B08126_009E  * B11002_001E*1.0/B01001_001E
+Persons_industry_9,TRACT,persons,1000,INDUSTRY9,(persons.industry == 9),B08126_010E  * B11002_001E*1.0/B01001_001E
+Persons_industry_10,TRACT,persons,1000,INDUSTRY10,(persons.industry == 10),B08126_011E  * B11002_001E*1.0/B01001_001E
+Persons_industry_11,TRACT,persons,1000,INDUSTRY11,(persons.industry == 11),B08126_012E  * B11002_001E*1.0/B01001_001E
+Persons_industry_12,TRACT,persons,1000,INDUSTRY12,(persons.industry == 12),B08126_013E  * B11002_001E*1.0/B01001_001E
+Persons_industry_13,TRACT,persons,1000,INDUSTRY13,(persons.industry == 13),B08126_014E  * B11002_001E*1.0/B01001_001E
+Persons_industry_14,TRACT,persons,1000,INDUSTRY14,(persons.industry == 14),B08126_015E  * B11002_001E*1.0/B01001_001E
+persons_worker,TRACT,persons,100000,EMPWORKER,"persons.ESR.isin([1,2,4,5])",(B08014_001E) * B11002_001E*1.0/B01001_001E

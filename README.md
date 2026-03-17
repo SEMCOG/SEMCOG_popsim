@@ -23,23 +23,31 @@ A major function of SEMCOG_popsim is to prepare input configuration and dataset 
 python scripts/prepare_inputs.py <key> <yml>
 ```
 
-Arguments:
-- `key`: Census API key
-- `yml`: input maker configuration such as `input_prep/2019/region_2019.yaml`
+Preferred config location:
+- `projects/<year>/prepare.yaml`
+
+Examples:
+```bash
+python scripts/prepare_inputs.py <key> projects/2019/prepare.yaml
+python scripts/prepare_inputs.py <key> projects/2022/prepare.yaml
+```
 
 Legacy compatibility entrypoint:
 ```bash
 python input_prep/popsim_input_maker.py <key> <yml>
 ```
 
+Legacy config locations under `input_prep/<year>/` still work during migration.
+
 ### Inputs
-- *[year]\_controls\_pre\_[year].csv*: an extended PopulationSim control file with an added `acs_variables` field used to download Census marginals and compile target control variables.
-- *[year]\_region\_[year].yaml* or similar year-specific prep config: configuration for the input maker, including PUMS locations, geography files, and PUMS variable updates.
+- *controls_pre.csv*: an extended PopulationSim control file with an added `acs_variables` field used to download Census marginals and compile target control variables.
+- *prepare.yaml*: project/year-specific prep configuration, including PUMS locations, geography files, and PUMS variable updates.
+- *settings.yaml*: project/year-specific PopulationSim settings template.
 - *PUMS/*: household and person PUMS files for the region.
-- *geo/*: geographic crosswalk and equivalency tables.
+- *projects/geo/*: shared geographic crosswalk and equivalency tables.
 
 ### Outputs
-All outputs are produced to `[year]/data` in the current layout.
+All outputs are still produced to `[year]/data` in the current migration stage.
 - *[region]\_[year]\_geo\_cross\_walk.csv*: crosswalk table for synthesis geographies.
 - *[region]\_[year]\_control\_totals\_[geo].csv*: control marginals by geography.
 - *[region]\_[year]\_seed\_households.csv*: seed households.
@@ -49,22 +57,19 @@ All outputs are produced to `[year]/data` in the current layout.
 ### Optional adjustments
 All marginal controls could be scaled to closer-to-reality totals. For example, 2019 5-year ACS block group controls can be adjusted to 2019 1-year ACS county totals.
 
-Preferred adjustment entrypoint:
+Adjustment config example:
 ```bash
-python input_prep/popsim_input_control_adj.py <key> <yml>
+python input_prep/popsim_input_control_adj.py <key> projects/2019/control_adjustment.yaml
 ```
 
-A county-level control file is also needed. Its format is similar to *[year]\_controls\_pre\_[year].csv*.
+### Phase 1 and 2 migration note
+The migration now includes:
+- package-backed prep code in `src/semcog_popsim/input_prep/`
+- a package-backed run entrypoint in `src/semcog_popsim/pipeline/`
+- standardized project assets under `projects/<year>/`
+- shared prep geography assets under `projects/geo/`
 
-Step 2. Adjust controls using `input_prep/adjust_to_acs1_county.py`.
-
-### Phase 1 note
-Phase 1 of the target-structure migration has introduced package-backed prep code in:
-- `src/semcog_popsim/input_prep/maker.py`
-- `src/semcog_popsim/input_prep/control_adjustment.py`
-- `src/semcog_popsim/input_prep/utils.py`
-
-The project/year assets have not yet been moved out of `input_prep/`.
+The original files under `input_prep/<year>/` are still present for backward compatibility.
 
 ---
 ## 2. Run Population Synthesis
