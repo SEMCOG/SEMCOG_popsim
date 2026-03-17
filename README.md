@@ -62,7 +62,7 @@ Adjustment config example:
 python input_prep/popsim_input_control_adj.py <key> projects/2019/control_adjustment.yaml
 ```
 
-### Phase 1 and 2 migration note
+### Migration note
 The migration now includes:
 - package-backed prep code in `src/semcog_popsim/input_prep/`
 - a package-backed run entrypoint in `src/semcog_popsim/pipeline/`
@@ -86,7 +86,15 @@ python scripts/run_populationsim.py
 python run_populationsim.py
 ```
 
-Input structure:
+### Runtime config layout
+The target runtime structure is being introduced in parallel with the legacy flat config directory.
+
+Current migration state:
+- legacy active config files still exist directly under `configs/`
+- reusable config fragments are now mirrored under `configs/base/`
+- an example run-specific set now exists under `configs/runs/2020/`
+
+Input structure still used by the live workflow:
 - `configs/settings.yaml`: project settings
 - `configs/controls.csv` or the control file defined in `settings.yaml`
 - `data/xxx_geo_cross_walk.csv`

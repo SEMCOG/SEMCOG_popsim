@@ -1,3 +1,14 @@
 # Base Configs
 
-This directory is reserved for reusable base configuration fragments as the repository migrates away from a single flat `configs/` layout.
+This directory holds reusable configuration building blocks copied from the legacy flat `configs/` layout.
+
+Current contents:
+- `data_structure.yaml`
+- `files.yaml`
+- `mcd.yaml`
+- `placement.yaml`
+- `setup.yaml`
+- `sql.yaml`
+- `transform.yaml`
+
+The original files still remain in `configs/` for backward compatibility during migration.

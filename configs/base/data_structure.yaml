@@ -1,0 +1,248 @@
+annual_employment_control_totals:
+  home_based_status:              int8
+  large_area_id:                  int16
+  sector_id:                      int8
+  total_number_of_jobs:           int32
+  year:                           int16
+annual_household_control_totals:
+  age_of_head_max:                int8
+  age_of_head_min:                int8
+  cars_max:                       int8
+  cars_min:                       int8
+  children_max:                   int8
+  children_min:                   int8
+  income_max:                     int32
+  income_min:                     int32
+  large_area_id:                  int16
+  persons_max:                    int8
+  persons_min:                    int8
+  race_id:                        int8
+  total_number_of_households:     int32
+  workers_max:                    int8
+  workers_min:                    int8
+  year:                           int16
+annual_relocation_rates_for_households:
+  age_max:                        int16
+  age_min:                        int16
+  income_max:                     int32
+  income_min:                     int32
+  probability_of_relocating:      float64
+annual_relocation_rates_for_jobs:
+  job_relocation_probability:     float64
+  sector_id:                      int8
+building_sqft_per_job:
+  building_sqft_per_job:          int16
+  building_type_id:               int16
+building_types:
+  building_type_description:      object
+  building_type_id:               int8
+  building_type_name:             object
+  generic_building_type_description: object
+  generic_building_type_id:       int8
+  generic_building_type_name:     object
+  is_residential:                 int8
+  naics:                          object
+  unit_name:                      object
+buildings:
+  building_id:                    int32
+  building_type_id:               int8
+  improvement_value:              float64
+  land_area:                      int32
+  non_residential_sqft:           int64
+  parcel_id:                      int32
+  residential_units:              int16
+  sqft_per_unit:                  int16
+  stories:                        float64
+  year_built:                     int16
+counties:
+  county_id:                      int16
+  county_name:                    object
+crime_rates:
+  other_crime_rate:               float64
+  parcel_id:                      int32
+  ucr_crime_rate:                 float64
+employment_sectors:
+  naics sector description:       object
+  naics_code:                     object
+  sector_id:                      int8
+  sector_name:                    object
+  sqft_per_job:                   int16
+events_addition:
+  building_type_id:               int8
+  non_residential_sqft:           int32
+  parcel_id:                      int32
+  residential_units:              int16
+  year_built:                     int16
+events_deletion:
+  building_id:                    int32
+  year_built:                     int16
+group_quarters:
+  age:                            int16
+  building_id:                    int32
+  gq_code:                        int16
+  personid:                       int32
+  race_id:                        int16
+  type:                           object
+group_quarters_control_totals: 
+  city_id:                        int32
+  count:                          int32
+  year:                           int16
+households:
+  age_of_head:                    int8
+  building_id:                    int32
+  cars:                           int8
+  children:                       int8
+  household_id:                   int32
+  income:                         float64
+  persons:                        int8
+  race_id:                        int8
+  workers:                        int8
+jobs:
+  building_id:                    int32
+  home_based_status:              int8
+  sector_id:                      int8
+  sqft:                           int16
+land_use_types:
+  description:                    object
+  generic_land_use_type_descripti: object
+  generic_land_use_type_id:       int8
+  home_based_status:              int8
+  is_residential:                 int8
+  land_use_name:                  object
+  land_use_type_id:               int8
+  unit_name:                      object
+large_areas:
+  large_area_id:                  int16
+  large_area_name:                object
+  alt_large_id:                   int16
+  large_area_group_id:            int16
+orig_lu_parcels: 
+  census_bg_id:                   object
+  census_block_id:                object
+  centroid_x:                     float64
+  centroid_y:                     float64
+  city_id:                        int16
+  county_id:                      int16
+  land_use_type_id:               int16
+  large_area_id:                  int16
+  parcel_id:                      int32
+  parcel_sqft:                    int32
+  pptytax:                        float64
+  school_id:                      int32
+  semmcd:                         int16
+  sev_value:                      int32
+  spid:                           int32
+  tax_exempt_flag:                int16
+  zone_id:                        int16
+parcels:
+  census_bg_id:                   int32
+  centroid_x:                     float64
+  centroid_y:                     float64
+  city_id:                        int16
+  county_id:                      int16
+  land_use_type_id:               int8
+  large_area_id:                  int16
+  parcel_id:                      int32
+  parcel_sqft:                    int32
+  pptytax:                        float64
+  school_id:                      int32
+  semmcd:                         int16
+  sev_value:                      int32
+  zone_id:                        int32
+persons:
+  age:                            int8
+  household_id:                   int32
+  member_id:                      int8
+  person_id:                      int32
+  race_id:                        int8
+  relate:                         int8
+  sex:                            int8
+  worker:                         int8
+  naicsp:                         object
+  industry:                       int8
+poi:
+  category:                       object
+  point_x:                        float64
+  point_y:                        float64
+refiner_events:
+  refinement_id:                  int16
+  transaction_id:                 int16
+  year:                           int16
+  action:                         object
+  agent_expression:               object
+  agents:                         object
+  amount:                         int16
+  location_capacity_attribute:    float64 # all NaN
+  location_expression:            object
+school_districts:
+  district_name:                  object
+  isd_code:                       int8
+  isd_name:                       object
+  meap10:                         float32
+  proficient10:                   float32
+  public:                         int8
+  school_district_id:             int32
+schools:
+  bcode:                          int16
+  bname:                          object
+  dcode:                          int32
+  gradelist:                      object
+  is_grade_school:                int8
+  point_x:                        float64
+  point_y:                        float64
+  totalachievementindex:          float64
+semmcds:
+  city_name:                      object
+  semmcd_id:                      int16
+transit_stops:
+  point_x:                        float64
+  point_y:                        float64
+  stop_id:                        object
+travel_data:
+  am_auto_total_time:             float32
+  am_transit_total_time:          float32
+  am_work_highinc_logsum:         float32
+  am_work_lowinc_logsum:          float32
+  from_zone_id:                   int32
+  midday_auto_total_time:         float32
+  midday_other_logsum:            float32
+  midday_transit_total_time:      float32
+  to_zone_id:                     int32
+travel_data_2030:
+  am_auto_total_time:             float32
+  am_transit_total_time:          float32
+  am_work_highinc_logsum:         float32
+  am_work_lowinc_logsum:          float32
+  from_zone_id:                   int32
+  midday_auto_total_time:         float32
+  midday_other_logsum:            float32
+  midday_transit_total_time:      float32
+  to_zone_id:                     int32
+employed_workers_rate:
+  age_max:                        int8
+  age_min:                        int8
+  large_area_id:                  int16
+zones:
+  acres:                          float64
+  tax:                            object
+  tazce10_n:                      int32
+  zone_id:                        int16
+zoning: 
+  future_use:                     object
+  max_dua:                        float64
+  max_far:                        float64
+  max_height:                     int16
+  max_stories:                    float16
+  parcel_id:                      int32
+  pct_undev:                      float64
+target_vacancies: 
+  year:                           int16
+  large_area_id:                  int16
+  res_target_vacancy_rate:        float64
+  non_res_target_vacancy_rate:    float64
+
+
+
+  
+  
+
