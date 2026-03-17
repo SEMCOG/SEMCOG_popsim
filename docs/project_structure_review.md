@@ -9,7 +9,7 @@ The core workflow is clearly separated into:
 1. package-backed prep code under `src/semcog_popsim/input_prep/`
 2. package-backed PopulationSim execution under `src/semcog_popsim/pipeline/`
 3. operational entrypoints under `scripts/`
-4. year-specific assets under `projects/`
+4. project/scenario assets under `projects/`
 5. archived legacy material under `archive/`
 
 The original design idea was sound from the start: one phase prepares inputs and one phase runs synthesis. The main work has been turning that idea into a clearer repository structure and reducing the amount of duplicated, notebook-derived, and path-coupled code.
@@ -65,7 +65,7 @@ SEMCOG_popsim/
 - the remaining root-level runner files are explicitly compatibility-only
 - input-prep code was packaged
 - PopulationSim run logic was packaged
-- project/year assets were copied into a clearer `projects/` layout
+- project/scenario assets were copied into a clearer `projects/` layout
 - duplicated utility logic was reduced
 - legacy adjustment helpers were converted into valid scripts
 - refinement and placement runners now share package-backed logic

@@ -41,7 +41,7 @@ Legacy config locations under `input_prep/<year>/` still work during migration.
 
 ### Inputs
 - `projects/<name>/prepare.yaml`: prep configuration
-- `projects/<name>/settings.yaml`: project-specific PopulationSim settings template
+- `projects/<name>/settings.yaml`: project/scenario-specific PopulationSim settings template
 - `projects/<name>/controls_pre.csv`: control-prep table
 - `projects/geo/`: shared geographic crosswalk and equivalency tables
 - PUMS input files referenced by the prep config
@@ -136,7 +136,7 @@ Implemented so far:
 - package-backed refinement and placement orchestration
 - packaged forecast-input helpers under `src/semcog_popsim/forecast_input/`
 - legacy top-level `forecast_input/` kept only as a compatibility shim
-- `projects/<year>/` structure for year-specific assets
+- `projects/<name>/` structure for project/scenario-specific assets
 - `configs/base/` and `configs/runs/` scaffolding
 - `archive/` for low-risk legacy material
 

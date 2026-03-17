@@ -43,7 +43,7 @@ SEMCOG_popsim/
 The intent is to separate:
 - reusable source code
 - run entrypoints
-- year/scenario-specific project assets
+- project/scenario-specific assets
 - generated data
 - legacy or exploratory material
 
@@ -58,7 +58,7 @@ The intent is to separate:
 - packaged runner now owns its own standard CLI parsing instead of depending on ActivitySim's fragile CLI import path
 - `scripts/prepare_inputs.py` and `scripts/run_popsim.py` added
 - compatibility wrappers retained for legacy entrypoints, with `scripts/` established as the canonical launcher surface
-- year-specific project assets copied into `projects/<year>/`
+- project/scenario assets copied into `projects/<name>/`
 - shared geography crosswalks copied into `projects/geo/`
 - `configs/base/` plus run-specific sets for 2019, 2020, and 2022 created as parallel target structure
 - `archive/` created and low-risk legacy content moved there
@@ -72,7 +72,7 @@ The intent is to separate:
 
 - the canonical runtime flow still depends on the legacy flat `configs/` layout
 - `configs/runs/<name>/` now exists as the reusable target pattern, but the runtime still leans on the legacy flat `configs/` path in some workflows
-- generated outputs still primarily land in legacy year/data locations rather than a fully enforced `data/raw|interim|processed` flow
+- generated outputs can now be redirected, but the repo still does not enforce a single canonical `data/raw|interim|processed` flow
 - validation helpers have not yet been packaged into `src/semcog_popsim/validation/`
 - several notebooks and legacy helper files still remain outside `archive/`
 - path-heavy runner scripts still use machine-specific locations and have not yet been generalized into project-driven configs
@@ -83,7 +83,7 @@ The repository now has a clearer high-level workflow than it started with:
 
 1. `scripts/prepare_inputs.py` calls packaged input-prep code in `src/semcog_popsim/input_prep/`.
 2. `scripts/run_popsim.py` calls packaged PopulationSim execution code in `src/semcog_popsim/pipeline/`.
-3. project/year assets now also exist under `projects/<year>/`.
+3. project/scenario assets now also exist under `projects/<name>/`.
 4. non-core refinement and placement runners have started moving toward package-backed shared logic.
 
 The remaining work is less about initial structure creation and more about consolidating the active workflow around the new structure.
@@ -155,7 +155,7 @@ Remaining:
 Status: partially completed
 
 Delivered:
-- `projects/2017`, `projects/2019`, `projects/2020`, `projects/2022`
+- `projects/2017`, `projects/2019`, `projects/2020`, `projects/2022` and the generic `projects/<name>/` pattern
 - standardized `prepare.yaml`, `settings.yaml`, and `controls_pre.csv` copies
 - shared `projects/geo/`
 
@@ -169,7 +169,7 @@ Delivered:
 - `data/raw/`, `data/interim/`, `data/processed/`
 - `outputs/`
 - `configs/base/`
-- `configs/runs/2020/`
+- `configs/runs/2019/`, `configs/runs/2020/`, and `configs/runs/2022/`
 
 Remaining:
 - make the active runtime prefer the new structure instead of just mirroring it
@@ -181,6 +181,8 @@ Status: partially completed
 Delivered:
 - forecast refinement runner packaging
 - placement runner packaging
+- reusable forecast-input helper packaging
+- CLI overrides for refinement and placement scripts
 
 Remaining:
 - validation packaging
@@ -209,8 +211,8 @@ Recommended next order:
 ## Success Criteria
 
 The migration will feel operationally complete when:
-- prep uses `scripts/prepare_inputs.py` with `projects/<year>/prepare.yaml`
-- synthesis uses `scripts/run_popsim.py` with clearly defined `configs/runs/<year>/`
+- prep uses `scripts/prepare_inputs.py` with `projects/<name>/prepare.yaml`
+- synthesis uses `scripts/run_popsim.py` with clearly defined `configs/runs/<name>/`
 - reusable logic lives under `src/semcog_popsim/`
 - year/scenario assets live under `projects/`
 - generated artifacts have a clearer home under `data/` and `outputs/`
