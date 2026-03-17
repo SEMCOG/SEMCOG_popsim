@@ -125,7 +125,7 @@ Year-specific wrappers remain under `scripts/`:
 - `scripts/run_placement_2015.py`
 - `scripts/run_placement_2020.py`
 
-These scripts still use environment-specific file paths and should currently be treated as project-local operational wrappers rather than portable command-line tools.
+These scripts still ship with environment-specific default paths, but they now expose command-line overrides so you do not have to edit the files for each run.
 
 ---
 ## 4. Current Migration State

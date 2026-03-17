@@ -1,3 +1,4 @@
+import argparse
 import sys
 from pathlib import Path
 
@@ -14,12 +15,12 @@ from semcog_popsim.forecast_refinement.placement_runner import (
 )
 
 RUN_NUMBER = "100124_run_2020"
-HDF_PATH = "/home/da/share/urbansim/RDF2050/model_inputs/base_hdf/forecast_data_input_031523.h5"
-HOUSEHOLD_CSV = "/mnt/hgfs/urbansim/RDF2050/population_synthesis/historical/2020(2022)/synthetic_households_ybl.csv"
-PERSON_CSV = "/mnt/hgfs/urbansim/RDF2050/population_synthesis/historical/2020(2022)/synthetic_persons.csv"
-VOTER_REGISTRATION_CSV = "/mnt/hgfs/da/Staff/Nutting/RDF2050/Qualified Voter File/placement_2020.csv"
-LOAD_FROM_HDF = False
-SQL = """
+DEFAULT_HDF_PATH = Path("/home/da/share/urbansim/RDF2050/model_inputs/base_hdf/forecast_data_input_031523.h5")
+DEFAULT_HOUSEHOLD_CSV = Path("/mnt/hgfs/urbansim/RDF2050/population_synthesis/historical/2020(2022)/synthetic_households_ybl.csv")
+DEFAULT_PERSON_CSV = Path("/mnt/hgfs/urbansim/RDF2050/population_synthesis/historical/2020(2022)/synthetic_persons.csv")
+DEFAULT_VOTER_REGISTRATION_CSV = Path("/mnt/hgfs/da/Staff/Nutting/RDF2050/Qualified Voter File/placement_2020.csv")
+DEFAULT_OUTPUT_DIR = REPO_ROOT / "output" / RUN_NUMBER
+DEFAULT_SQL = """
       SELECT 
       urbansim_buildings.building_id,
       urbansim_buildings.parcel_id, 
@@ -41,22 +42,38 @@ SQL = """
       LEFT JOIN urbansim_parcels as p ON 
           urbansim_buildings.parcel_id=p.parcel_id;
 """
-CONNECTION_STRING = "postgresql://USER:PSWD@SERVER:PORT/DBNAME"
+DEFAULT_CONNECTION_STRING = "postgresql://USER:PSWD@SERVER:PORT/DBNAME"
 
 
-def main():
-    if LOAD_FROM_HDF:
-        loader = lambda: load_buildings_from_hdf(HDF_PATH)
+def build_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--run-number", default=RUN_NUMBER)
+    parser.add_argument("--hdf-path", default=str(DEFAULT_HDF_PATH))
+    parser.add_argument("--household-csv", default=str(DEFAULT_HOUSEHOLD_CSV))
+    parser.add_argument("--person-csv", default=str(DEFAULT_PERSON_CSV))
+    parser.add_argument("--voter-registration-csv", default=str(DEFAULT_VOTER_REGISTRATION_CSV))
+    parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
+    parser.add_argument("--load-from-hdf", action="store_true")
+    parser.add_argument("--sql", default=DEFAULT_SQL)
+    parser.add_argument("--connection-string", default=DEFAULT_CONNECTION_STRING)
+    return parser
+
+
+def main(argv=None):
+    args = build_parser().parse_args(argv)
+    hdf_path = Path(args.hdf_path)
+    if args.load_from_hdf:
+        loader = lambda: load_buildings_from_hdf(hdf_path)
     else:
-        loader = lambda: load_buildings_from_sql(SQL, CONNECTION_STRING, HDF_PATH)
+        loader = lambda: load_buildings_from_sql(args.sql, args.connection_string, hdf_path)
 
     run_household_placement(
-        run_number=RUN_NUMBER,
-        hdf_path=HDF_PATH,
-        household_csv=HOUSEHOLD_CSV,
-        person_csv=PERSON_CSV,
-        voter_registration_csv=VOTER_REGISTRATION_CSV,
-        output_dir=REPO_ROOT / "output" / RUN_NUMBER,
+        run_number=args.run_number,
+        hdf_path=hdf_path,
+        household_csv=args.household_csv,
+        person_csv=args.person_csv,
+        voter_registration_csv=args.voter_registration_csv,
+        output_dir=args.output_dir,
         buildings_loader=loader,
     )
 
