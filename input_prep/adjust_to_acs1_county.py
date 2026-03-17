@@ -1,12 +1,11 @@
-# To add a new cell, type '# %%'
-# To add a new markdown cell, type '# %% [markdown]'
-# %%
+import argparse
+from pathlib import Path
+
 import pandas as pd
-import os
-from input_utils import *
+
+from input_utils import marginal_summary
 
 
-# %%
 def csv_reader(fname, key_col):
     df = pd.read_csv(fname, index_col=key_col)
     df.drop(df.columns[0], axis=1, inplace=True)
@@ -14,74 +13,60 @@ def csv_reader(fname, key_col):
 
 
 def make_countyid(df):
-    df['COUNTYID'] = df.index.astype(str).str[:5].astype(int)
-    df = df.sort_index()  # important for later multiplication
+    df["COUNTYID"] = df.index.astype(str).str[:5].astype(int)
+    df = df.sort_index()
     return df
 
 
-# %%
 def update_by_category(df_controls, county_adj):
-    ind_name = df_controls.index.name
-    df_sum = df_controls.groupby('COUNTYID').sum()
-    df_diff = county_adj[df_sum.columns]/df_sum
-
-    # change index to COUNTYID, prepare for calculation
-    df_controls = df_controls.reset_index().set_index('COUNTYID')
-    #df_controls, df_diff = df_controls.align(df_diff)
-    # print(df_controls)
+    index_name = df_controls.index.name
+    df_sum = df_controls.groupby("COUNTYID").sum()
+    df_diff = county_adj[df_sum.columns] / df_sum
+    df_controls = df_controls.reset_index().set_index("COUNTYID")
     df_controls[df_diff.columns] = df_controls[df_diff.columns] * df_diff
-    df_controls = df_controls.reset_index().set_index(ind_name)
-
+    df_controls = df_controls.reset_index().set_index(index_name)
     return df_controls
 
 
 def update_by_total(df_controls, county_totals):
-    # county_totals should have county_id as index, and HHBASE, POPBASE
+    index_name = df_controls.index.name
+    df_sum = df_controls.groupby("COUNTYID").sum()
+    household_cols = [col for col in df_sum.columns if "HH" in col]
+    person_cols = [col for col in df_sum.columns if col not in household_cols]
+    df_controls = df_controls.reset_index().set_index("COUNTYID")
 
-    ind_name = df_controls.index.name
-    df_sum = df_controls.groupby('COUNTYID').sum()
-    hcols = [c for c in df_sum.columns if "HH" in c]
-    pcols = [c for c in df_sum.columns if c not in hcols]
-    df_controls = df_controls.reset_index().set_index('COUNTYID')
+    if household_cols:
+        if "HHBASE" not in household_cols:
+            attr = "".join(char for char in household_cols[0] if not char.isdigit())
+            cols = [col for col in household_cols if col.startswith(attr)]
+            df_sum["HHBASE"] = df_sum[cols].sum(axis=1)
+        diff = county_totals["HHBASE"] / df_sum["HHBASE"]
+        df_controls[household_cols] = df_controls[household_cols].apply(lambda x: x * diff, axis=0)
 
-    if hcols != []:
-        if not 'HHBASE' in hcols:
-            at = ''.join(i for i in hcols[0] if not i.isdigit())
-            cols = [c for c in hcols if c.startswith(at)]
-            df_sum['HHBASE'] = df_sum[cols].sum(axis=1)
-        #df_controls, tt = df_controls.align(tt, axis=1)
-        diff = county_totals['HHBASE']/df_sum['HHBASE']
-        df_controls[hcols] = df_controls[hcols].apply(
-            lambda x: x * diff, axis=0)
+    if person_cols:
+        if "POPBASE" not in person_cols:
+            attr = "".join(char for char in household_cols[0] if not char.isdigit())
+            cols = [col for col in person_cols if col.startswith(attr)]
+            df_sum["POPBASE"] = df_sum[cols].sum(axis=1)
+        diff = county_totals["POPBASE"] / df_sum["POPBASE"]
+        df_controls[person_cols] = df_controls[person_cols].apply(lambda x: x * diff, axis=0)
 
-    if pcols != []:
-        if not 'POPBASE' in pcols:
-            at = ''.join(i for i in hcols[0] if not i.isdigit())
-            cols = [c for c in pcols if c.startswith(at)]
-            df_sum['POPBASE'] = df_sum[cols].sum(axis=1)
-        diff = county_totals['POPBASE']/df_sum['POPBASE']
-        df_controls[pcols] = df_controls[pcols].apply(
-            lambda x: x * diff, axis=0)
-
-    df_controls = df_controls.reset_index().set_index(ind_name)
-
+    df_controls = df_controls.reset_index().set_index(index_name)
     return df_controls
 
 
-def intergerize(ds):
-    add_count = int(ds.sum().round() - (ds//1).sum())
-    add_ind = (ds % 1).nlargest(add_count).index
-    ds = ds//1
-    ds.loc[add_ind] = ds//1 + 1
-
-    return ds
+def integerize(series):
+    add_count = int(series.sum().round() - (series // 1).sum())
+    add_index = (series % 1).nlargest(add_count).index
+    series = series // 1
+    series.loc[add_index] = series // 1 + 1
+    return series
 
 
 def integerize_df(df_controls, int_col):
-    # int_col is the columns for aggregation, integrized sum should add up to the original total of this column
-    for grp, dfg in df_controls.groupby(int_col):
-        for col in dfg.columns:
-            df_controls.loc[dfg.index, col] = intergerize(dfg[col])
+    for _, df_group in df_controls.groupby(int_col):
+        for col in df_group.columns:
+            df_controls.loc[df_group.index, col] = integerize(df_group[col])
     return df_controls
 
 
@@ -90,64 +75,66 @@ def prepare(csv_file, geoid):
     return make_countyid(df)
 
 
-def adjust_by_county_cat(geo_control, cnty_control):
-    geo_control = update_by_category(geo_control, cnty_control)
-    geo_control = integerize_df(geo_control, 'COUNTYID')
+def adjust_by_county_cat(geo_control, county_control):
+    geo_control = update_by_category(geo_control, county_control)
+    geo_control = integerize_df(geo_control, "COUNTYID")
     return geo_control
 
 
-def adjust_by_county_total(geo_control, cnty_control):
-    geo_control = update_by_total(geo_control, cnty_control)
-    geo_control = integerize_df(geo_control, 'COUNTYID')
+def adjust_by_county_total(geo_control, county_control):
+    geo_control = update_by_total(geo_control, county_control)
+    geo_control = integerize_df(geo_control, "COUNTYID")
     return geo_control
 
 
-# %%
-bg_file = "2019/data/SEMCOG_2019_control_totals_blkgrp.csv"
-bg_key = "BLKGRPID"
-trt_file = "2019/data/SEMCOG_2019_control_totals_tract.csv"
-trt_key = "TRACTID"
-cnty_file = "2019/data/SEMCOG_2019_control_totals_county_adj.csv"
-cnty_key = "COUNTYID"
+def build_parser():
+    parser = argparse.ArgumentParser(description="Adjust blockgroup and tract controls to ACS1 county controls.")
+    parser.add_argument("--year", type=int, default=2019)
+    parser.add_argument("--mode", choices=["category", "total"], default="category")
+    parser.add_argument("--base-dir", default=".", help="Directory containing the year folder.")
+    return parser
 
 
-# %%
-# adjust by all categories
-df_cnty = prepare(cnty_file, cnty_key)
-df_bg = prepare(bg_file, bg_key)
-marginal_summary(df_bg)
-df_bg = adjust_by_county_cat(df_bg, df_cnty)
-marginal_summary(df_bg)
+def main(argv=None):
+    args = build_parser().parse_args(argv)
+    base_dir = Path(args.base_dir).resolve()
+    year_dir = base_dir / str(args.year) / "data"
+
+    bg_file = year_dir / f"SEMCOG_{args.year}_control_totals_blkgrp.csv"
+    trt_file = year_dir / f"SEMCOG_{args.year}_control_totals_tract.csv"
+    county_file = year_dir / f"SEMCOG_{args.year}_control_totals_county_adj.csv"
+    output_suffix = "adj"
+
+    df_county = prepare(county_file, "COUNTYID")
+    df_bg = prepare(bg_file, "BLKGRPID")
+    df_trt = prepare(trt_file, "TRACTID")
+
+    print("\nBefore blockgroup adjustment")
+    marginal_summary(df_bg)
+    print("\nBefore tract adjustment")
+    marginal_summary(df_trt)
+
+    if args.mode == "category":
+        df_bg = adjust_by_county_cat(df_bg, df_county)
+        df_trt = adjust_by_county_cat(df_trt, df_county)
+    else:
+        df_bg = adjust_by_county_total(df_bg, df_county)
+        df_trt = adjust_by_county_total(df_trt, df_county)
+        output_suffix = "total_adj"
+
+    print("\nAfter blockgroup adjustment")
+    marginal_summary(df_bg)
+    print("\nAfter tract adjustment")
+    marginal_summary(df_trt)
+
+    bg_output = year_dir / f"SEMCOG_{args.year}_control_totals_blkgrp_{output_suffix}.csv"
+    trt_output = year_dir / f"SEMCOG_{args.year}_control_totals_tract_{output_suffix}.csv"
+    df_bg.to_csv(bg_output)
+    df_trt.to_csv(trt_output)
+
+    print(f"Saved {bg_output}")
+    print(f"Saved {trt_output}")
 
 
-# %%
-df_trt = prepare(trt_file, trt_key)
-marginal_summary(df_trt)
-df_trt = adjust_by_county_cat(df_trt, df_cnty)
-marginal_summary(df_trt)
-
-# %%
-df_bg.to_csv("2019/data/SEMCOG_2019_control_totals_blkgrp_adj.csv")
-df_trt.to_csv("2019/data/SEMCOG_2019_control_totals_tract_adj.csv")
-
-
-# %%
-%cd "d: \projects\populationsim\SEMCOG_popsim\input_prep\"
-
-# %%
-# adjust by county totals
-
-# %%
-df_cnty = prepare(cnty_file, cnty_key)
-df_bg = prepare(bg_file, bg_key)
-marginal_summary(df_bg)
-df_bg = adjust_by_county_total(df_bg, df_cnty)
-print('\n after ___________')
-marginal_summary(df_bg)
-# %%
-df_trt = prepare(trt_file, trt_key)
-marginal_summary(df_trt)
-df_trt = adjust_by_county_cat(df_trt, df_cnty)
-marginal_summary(df_trt)
-
-# %%
+if __name__ == "__main__":
+    main()
