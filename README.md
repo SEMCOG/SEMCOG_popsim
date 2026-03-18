@@ -62,13 +62,19 @@ populationsim \
   -o /home/da/RDF2055/d_drive/popsim/runs/2024_synthesis/output
 ```
 
+Reusable shell runner:
+```bash
+./scripts/run_2024_synthesis.sh
+```
+
 Notes:
 - the generated settings file uses `data_dir: data`, so the CLI should point `-d` to the run package data folder
-- the SEMCOG helper script `run_populationsim.py` is legacy compatibility code; prefer the upstream `populationsim` CLI in Docker
+- `scripts/run_2024_synthesis.sh` is the current SEMCOG helper for the full 2024 run and log setup
+- older root-level runner scripts have been moved to `scripts/archive/`
 
 ##### *(Optional)* household size rebalance:
 - To adjust household size and solve the over sized 7+ HHs issue, a rebalance process is needed.
-- `hh_size_balancer.py` will need a household-size control file and the output summary file to create a new control file with new household size distribution.
+- `scripts/archive/hh_size_balancer.py` will need a household-size control file and the output summary file to create a new control file with new household size distribution.
 - Rerun PopulationSim with new household sizes.
 - Repeat this process as needed.
 
