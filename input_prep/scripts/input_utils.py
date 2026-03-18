@@ -240,9 +240,10 @@ def pums_update(df, dic_var):
     for k in dic_var.keys():
         if k in df.columns:
             conv = dic_var[k]
-            df[conv['std_variable']] = df[k]
+            updated_values = df[k]
             if 'std_codes' in conv:
-                df[conv['std_variable']].replace(conv['std_codes'], inplace=True)
+                updated_values = updated_values.replace(conv['std_codes'])
+            df[conv['std_variable']] = updated_values
 
     return df
 

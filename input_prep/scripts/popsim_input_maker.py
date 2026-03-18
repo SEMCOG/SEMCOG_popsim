@@ -110,6 +110,7 @@ output_controls_file = config_output_dir / "controls.csv"
 geo = conf["geography"]
 state = geo["state"][0]
 counties = geo["counties"]
+pums_updates = conf.get("pums_var_updates", conf.get("census_updates", {}))
 
 output_folder.mkdir(parents=True, exist_ok=True)
 config_output_dir.mkdir(parents=True, exist_ok=True)
@@ -125,7 +126,7 @@ print(f"  run folder: {run_folder}")
 
 # %% [markdown]
 # step 1. make geographic cross work file
-if (acs_year<2010) or (acs_year>=2026):
+if (acs_year < 2010) or (acs_year > 2026):
     print("synthesis year should be between 2010 and 2026")
     exit()
 
@@ -267,9 +268,9 @@ p_pums = pd.read_csv(p_pums_csv, dtype={"SERIALNO": str, "PUMA": str})
 
 # Census might change variable names by year, changed variables are in region config file
 # https://www2.census.gov/programs-surveys/acs/tech_docs/pums/ACS2019_PUMS_README.pdf?
-if acs_year in conf["pums_var_updates"]:
-    h_pums = pums_update(h_pums, conf["pums_var_updates"][acs_year])
-    p_pums = pums_update(p_pums, conf["pums_var_updates"][acs_year])
+if acs_year in pums_updates:
+    h_pums = pums_update(h_pums, pums_updates[acs_year])
+    p_pums = pums_update(p_pums, pums_updates[acs_year])
 
 emp_df = pd.DataFrame()
 h_samples, p_samples = [], []
@@ -348,24 +349,28 @@ prj_settings["seed_geography"] = "PUMA"
 prj_settings["data_dir"] = "data"
 
 # %%
+remaining_ctr_geos = dict(ctr_geos)
+updated_input_tables = []
 for litem in prj_settings["input_table_list"]:
-    if litem["tablename"] == "households":
-        litem["filename"] = output_seed_hhs
-    if litem["tablename"] == "persons":
-        litem["filename"] = output_seed_persons
-    if litem["tablename"] == "geo_cross_walk":
-        litem["filename"] = output_geo_cross
-    if "_control_data" in litem["tablename"]:
-        geo = litem["tablename"].replace("_control_data", "")
-        if geo not in ctr_geos.keys():
-            prj_settings["input_table_list"].remove(litem)
-        else:
-            litem["filename"] = ctr_geos[geo]
-            del ctr_geos[geo]
-for k in ctr_geos:
-    prj_settings["input_table_list"].append(
-        {"tablename": k + "_control_data", "filename": ctr_geos[k]}
+    table_item = dict(litem)
+    tablename = table_item["tablename"]
+    if tablename == "households":
+        table_item["filename"] = output_seed_hhs
+    elif tablename == "persons":
+        table_item["filename"] = output_seed_persons
+    elif tablename == "geo_cross_walk":
+        table_item["filename"] = output_geo_cross
+    elif "_control_data" in tablename:
+        geo = tablename.replace("_control_data", "")
+        if geo not in remaining_ctr_geos:
+            continue
+        table_item["filename"] = remaining_ctr_geos.pop(geo)
+    updated_input_tables.append(table_item)
+for geo, filename in remaining_ctr_geos.items():
+    updated_input_tables.append(
+        {"tablename": geo + "_control_data", "filename": filename}
     )
+prj_settings["input_table_list"] = updated_input_tables
 
 # %%
 prj_settings["control_file_name"] = output_controls_file.name
