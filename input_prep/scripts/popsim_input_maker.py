@@ -69,6 +69,30 @@ def resolve_config_path(path_str, config_dir):
     return REPO_ROOT / path
 
 
+def build_rename_columns(columns, geography):
+    column_map = {}
+    if "BLKGRPID" in columns:
+        column_map["BLKGRPID"] = "BLKGRP"
+    if "TRACTID" in columns:
+        column_map["TRACTID"] = "TRACT"
+    if "PUMA" in columns:
+        column_map["PUMA"] = "PUMA"
+    if "PUMAID" in columns:
+        column_map["PUMAID"] = "PUMA"
+    if geography == "geo_cross_walk" and "REGION" in columns:
+        column_map["REGION"] = "REGION"
+    return column_map
+
+
+def runtime_control_columns(df):
+    runtime_cols = [
+        col
+        for col in ["target", "geography", "seed_table", "importance", "control_field", "expression"]
+        if col in df.columns
+    ]
+    return df.loc[:, runtime_cols].copy()
+
+
 # %%
 # set up project information from yaml
 config_path = Path(args.yaml)
@@ -181,7 +205,7 @@ df_geo_cross = pd.merge(df_geo, df_tract_puma, on="TRACTID", how="left")
 df_geo_cross["REGION"] = 2
 df_geo_cross = df_geo_cross[["TRACTID", "BLKGRPID", "PUMA", "COUNTYID", "REGION"]]
 print("  saving geo cross walk to: " + str(output_folder / output_geo_cross))
-df_geo_cross.to_csv(output_folder / output_geo_cross)
+df_geo_cross.to_csv(output_folder / output_geo_cross, index=False)
 
 
 # %% [markdown]
@@ -252,7 +276,7 @@ for geo, dfm in dic_margs.items():
     ctr_geos[geo] = f_output_control
 
     print("  saving controls to: " + str(output_folder / f_output_control))
-    dfm.to_csv(output_folder / f_output_control)
+    dfm.to_csv(output_folder / f_output_control, index=False)
     marginal_summary(dfm)
 
 
@@ -309,11 +333,11 @@ p_pums = pd.merge(
 print(
     f"- saving seed households: {output_folder / output_seed_hhs}.| total {str(len(h_pums))} records"
 )
-h_pums.to_csv(output_folder / output_seed_hhs)
+h_pums.to_csv(output_folder / output_seed_hhs, index=False)
 print(
     f"- saving seed persons: {output_folder / output_seed_persons}.| total {str(len(p_pums))} records"
 )
-p_pums.to_csv(output_folder / output_seed_persons)
+p_pums.to_csv(output_folder / output_seed_persons, index=False)
 
 
 # %% [markdown]
@@ -351,6 +375,8 @@ prj_settings["data_dir"] = "data"
 # %%
 remaining_ctr_geos = dict(ctr_geos)
 updated_input_tables = []
+geo_cross_columns = set(df_geo_cross.columns)
+control_columns_by_geo = {geo: set(df.columns) for geo, df in dic_margs.items()}
 for litem in prj_settings["input_table_list"]:
     table_item = dict(litem)
     tablename = table_item["tablename"]
@@ -360,15 +386,21 @@ for litem in prj_settings["input_table_list"]:
         table_item["filename"] = output_seed_persons
     elif tablename == "geo_cross_walk":
         table_item["filename"] = output_geo_cross
+        table_item["rename_columns"] = build_rename_columns(geo_cross_columns, "geo_cross_walk")
     elif "_control_data" in tablename:
         geo = tablename.replace("_control_data", "")
         if geo not in remaining_ctr_geos:
             continue
         table_item["filename"] = remaining_ctr_geos.pop(geo)
+        table_item["rename_columns"] = build_rename_columns(control_columns_by_geo[geo], geo)
     updated_input_tables.append(table_item)
 for geo, filename in remaining_ctr_geos.items():
     updated_input_tables.append(
-        {"tablename": geo + "_control_data", "filename": filename}
+        {
+            "tablename": geo + "_control_data",
+            "filename": filename,
+            "rename_columns": build_rename_columns(control_columns_by_geo[geo], geo),
+        }
     )
 prj_settings["input_table_list"] = updated_input_tables
 
@@ -381,7 +413,7 @@ prj_settings["output_tables"] = {
 
 
 sub_bal_lst = ["sub_balancing.geography=" + x for x in sorted_geos]
-prj_settings["run_list"]["steps"] = (
+prj_settings["models"] = (
     [
         "input_pre_processor",
         "setup_data_structures",
@@ -393,6 +425,7 @@ prj_settings["run_list"]["steps"] = (
     + sub_bal_lst
     + ["expand_households", "summarize", "write_tables", "write_synthetic_population"]
 )
+prj_settings.pop("run_list", None)
 
 with open(output_settings_file, "w") as yaml_file:
     yaml.dump(prj_settings, yaml_file, default_style=None, default_flow_style=False)
@@ -401,7 +434,8 @@ with open(output_settings_file, "w") as yaml_file:
 # %% [markdown]
 # # copy pre control file
 print("copy popsim master control file")
-shutil.copy(pre_control, output_controls_file)
+runtime_controls = runtime_control_columns(dfc)
+runtime_controls.to_csv(output_controls_file, index=False)
 
 # %%
 print(

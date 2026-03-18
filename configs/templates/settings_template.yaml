@@ -32,29 +32,29 @@ input_table_list:
   - tablename: households
     filename: SEMCOG_seed_households.csv
     index_col: hh_id
-    column_map:
+    rename_columns:
       hhnum: hh_id
   - tablename: persons
     filename: SEMCOG_seed_persons.csv
-    column_map:
+    rename_columns:
       hhnum: hh_id
       SPORDER: per_num
     drop_columns:
   - tablename: geo_cross_walk
     filename: semcog_geo_cross_walk.csv
-    column_map:
+    rename_columns:
       BLKGRPID: BLKGRP
       TRACTID: TRACT
       PUMAID: PUMA
   - tablename: BLKGRP_control_data
     filename: SEMCOG_control_totals_blkgrp.csv
-    column_map:
+    rename_columns:
       BLKGRPID: BLKGRP
       TRACTID: TRACT
       PUMAID: PUMA
   - tablename: TRACT_control_data
     filename: SEMCOG_control_totals_tract.csv
-    column_map:
+    rename_columns:
       BLKGRPID: BLKGRP
       TRACTID: TRACT
       PUMAID: PUMA
@@ -129,8 +129,7 @@ output_synthetic_population:
 
 # Steps for base mode
 # ------------------------------------------------------------------
-run_list:
-  steps:
+models:
     - input_pre_processor
     - setup_data_structures
     - initial_seed_balancing

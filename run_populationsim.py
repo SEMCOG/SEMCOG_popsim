@@ -13,8 +13,6 @@ from activitysim.core.config import handle_standard_args
 from activitysim.core.tracing import print_elapsed_time
 
 from activitysim.core.config import setting
-from populationsim import lp
-from populationsim import multi_integerizer
 
 
 # Add (and handle) 'standard' activitysim arguments:
@@ -42,8 +40,8 @@ logger.info("meta_control_data: %s"
 logger.info("control_file_name: %s"
             % setting('control_file_name'))
 
-logger.info("USE_CVXPY: %s" % lp.use_cvxpy())
-logger.info("USE_SIMUL_INTEGERIZER: %s" % multi_integerizer.use_simul_integerizer())
+logger.info("USE_CVXPY: %s" % setting('USE_CVXPY'))
+logger.info("USE_SIMUL_INTEGERIZER: %s" % setting('USE_SIMUL_INTEGERIZER'))
 
 
 # get the run list (name was possibly specified on the command line with the -m option)
