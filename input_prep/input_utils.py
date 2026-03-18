@@ -223,11 +223,10 @@ def preprocess_pums(h_pums, p_pums):
         "92": 13,
         "99": 0,
     }
-    p_pums["industry"] = p_pums.NAICSP.str[:2]
-    p_pums.industry.replace(dict_naics2ind, inplace=True)
-    p_pums.loc[p_pums.NAICSP.str[:6] == "928110", "industry"] = 14
-    p_pums.loc[p_pums.NAICSP.isnull(), "industry"] = 0
-    p_pums.industry = p_pums.industry.astype(int)
+    industry = p_pums["NAICSP"].astype("string").str[:2].map(dict_naics2ind)
+    industry = industry.fillna(0)
+    industry.loc[p_pums["NAICSP"].astype("string").str[:6] == "928110"] = 14
+    p_pums["industry"] = industry.astype(int)
  
     # adjust person income to current ACS year (release year)
     p_pums['pincome'] = p_pums['PINCP'] * p_pums['ADJINC'] / 1000000

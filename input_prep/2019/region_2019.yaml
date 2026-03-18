@@ -4,6 +4,7 @@
 #input_prep/controls_pre_[year].csv
 project:
   name: SEMCOG
+  run_name: 2019_synthesis
   target: "households"
   acs_year: 2019
   acs_sample: acs5
@@ -11,6 +12,9 @@ project:
   pre_control: "controls_pre_{}.csv"
   h_pums_csv: "PUMS/ss19hmi.csv"
   p_pums_csv: "PUMS/ss19pmi.csv"
+
+paths:
+  run_root: "/home/da/RDF2055/d_drive/popsim/runs"
 
 geography:
   name: SEMCOG

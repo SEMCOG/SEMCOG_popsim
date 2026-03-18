@@ -32,7 +32,10 @@ import re
 import time
 import pandas as pd
 from census import Census
-import oyaml as yaml
+try:
+    import oyaml as yaml
+except ModuleNotFoundError:
+    import yaml
 from collections import defaultdict
 from input_utils import *
 import argparse
@@ -49,6 +52,7 @@ t0 = time.time()
 INPUT_PREP_DIR = Path(__file__).resolve().parent
 REPO_ROOT = INPUT_PREP_DIR.parent
 DEFAULT_SETTINGS_TEMPLATE = REPO_ROOT / "configs" / "templates" / "settings_template.yaml"
+DEFAULT_RUN_ROOT = REPO_ROOT.parent / "d_drive" / "popsim" / "runs"
 
 
 def resolve_config_path(path_str, config_dir):
@@ -80,8 +84,8 @@ prj_name = prj["name"]
 target = prj["target"]
 acs_year = prj["acs_year"]
 acs_sample = prj["acs_sample"]  # acs5 or acs1
+run_name = prj.get("run_name", f"{acs_year}_synthesis")
 config_dir = config_path.parent
-prj_folder = config_dir
 settings_template = prj.get("settings_template")
 if settings_template:
     settings_file = resolve_config_path(settings_template, config_dir)
@@ -90,19 +94,30 @@ else:
 pre_control = resolve_config_path(prj["pre_control"].format(str(acs_year)), config_dir)
 h_pums_csv = resolve_config_path(prj["h_pums_csv"], config_dir)
 p_pums_csv = resolve_config_path(prj["p_pums_csv"], config_dir)
+paths_conf = conf.get("paths", {})
+run_root = resolve_config_path(paths_conf.get("run_root", str(DEFAULT_RUN_ROOT)), config_dir)
+run_folder = run_root / run_name
+output_folder = run_folder / "data"
+config_output_dir = run_folder / "configs"
+runtime_output_dir = run_folder / "output"
+output_settings_file = config_output_dir / "settings.yaml"
+output_controls_file = config_output_dir / "controls.csv"
 
 geo = conf["geography"]
 state = geo["state"][0]
 counties = geo["counties"]
 
-output_folder = prj_folder / "data"
 output_folder.mkdir(parents=True, exist_ok=True)
+config_output_dir.mkdir(parents=True, exist_ok=True)
+runtime_output_dir.mkdir(parents=True, exist_ok=True)
 output_geo_cross = "{}_{}_geo_cross_walk.csv".format(prj_name, str(acs_year))
 output_control = "{}_{}_control_totals_.csv".format(prj_name, str(acs_year))
 output_seed_hhs = "{}_{}_seed_households.csv".format(prj_name, str(acs_year))
 output_seed_persons = "{}_{}_seed_persons.csv".format(prj_name, str(acs_year))
 
-print(f"\n *** preparing {target} synthesisdata for year {acs_year} ***")
+print(f"\n *** preparing {target} synthesis data for year {acs_year} ***")
+print(f"  run name: {run_name}")
+print(f"  run folder: {run_folder}")
 
 # %% [markdown]
 # step 1. make geographic cross work file
@@ -135,11 +150,12 @@ dict_cross = {
 }
 
 dict_acs_pums = {
-    (2010,2011):[("TRACT10", "PUMA00")],
-    (2012,2013,2014,2015,2016):[("TRACT10", "PUMA00"),("TRACT10", "PUMA10")],
-    (2017,2018,2019):[("TRACT10", "PUMA10")],
-    (2020,2021):[("TRACT20", "PUMA10")],
-    (2022,2023,2024,2025,2026):[("TRACT20", "PUMA10"),("TRACT20", "PUMA20")]
+    (2010, 2011): [("TRACT10", "PUMA00")],
+    (2012, 2013, 2014, 2015, 2016): [("TRACT10", "PUMA00"), ("TRACT10", "PUMA10")],
+    (2017, 2018, 2019): [("TRACT10", "PUMA10")],
+    (2020, 2021): [("TRACT20", "PUMA10")],
+    (2022, 2023): [("TRACT20", "PUMA10"), ("TRACT20", "PUMA20")],
+    (2024, 2025, 2026): [("TRACT20", "PUMA20")],
 }
 
 # %%
@@ -325,7 +341,7 @@ geos.sort(key=lambda val: SORT_ORDER.index(val))
 prj_settings["geographies"] = geos  # sort by predefined order)
 prj_settings["seed_geography"] = "PUMA"
 
-prj_settings["data_dir"] = f"data/{acs_year}"
+prj_settings["data_dir"] = "data"
 
 # %%
 for litem in prj_settings["input_table_list"]:
@@ -348,7 +364,7 @@ for k in ctr_geos:
     )
 
 # %%
-prj_settings["control_file_name"] = "{}_{}_controls.csv".format(prj_name, str(acs_year))
+prj_settings["control_file_name"] = output_controls_file.name
 prj_settings["output_tables"] = {
     "action": "include",
     "tables": ["summary_" + x for x in sorted_geos],
@@ -369,24 +385,21 @@ prj_settings["run_list"]["steps"] = (
     + ["expand_households", "summarize", "write_tables", "write_synthetic_population"]
 )
 
-with open(
-    output_folder / "{}_{}_settings.yaml".format(prj_name, acs_year), "w"
-) as yaml_file:
+with open(output_settings_file, "w") as yaml_file:
     yaml.dump(prj_settings, yaml_file, default_style=None, default_flow_style=False)
 
 
 # %% [markdown]
 # # copy pre control file
 print("copy popsim master control file")
-shutil.copy(
-    pre_control, output_folder / "{}_{}_controls.csv".format(prj_name, str(acs_year)),
-)
+shutil.copy(pre_control, output_controls_file)
 
 # %%
 print(
     "\ntotal time: {} seconds".format(round(time.time() - t0, 1)),
-    "\nDone. All files are saved to " + str(output_folder),
-    "\nTo run Populationsim:",
-    '\n\t copy new settings and controls to configs folder and rename "xxx_settings.yaml" to "settings.yaml"',
-    f"\n\t copy other files in {acs_year}/data folder to data/{acs_year}/",
+    "\nDone. PopulationSim run package created at " + str(run_folder),
+    "\nRun folders:",
+    "\n\tconfigs: " + str(config_output_dir),
+    "\n\tdata: " + str(output_folder),
+    "\n\toutput: " + str(runtime_output_dir),
 )
