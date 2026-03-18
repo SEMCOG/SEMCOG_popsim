@@ -4,7 +4,7 @@
 
 # %%
 # This program prepares all inputs files needed by PopulationSim(RSG), including configuration, geo_crosswalk, Census marginals and PUMS sample households and persons
-# Syntax:  > python popsim_input_maker.py key yaml (key: Census API key; yaml: a yaml configuration file such as region.yaml)
+# Syntax:  > python input_prep/scripts/popsim_input_maker.py key input_prep/configs/<run_name>/prepare.yaml
 
 # Inputs:
 # [year]/region_[year].yaml  (yaml config input for input_maker.py)
@@ -49,7 +49,8 @@ parser.add_argument("yaml", help="yaml configuration file name")
 args = parser.parse_args()
 t0 = time.time()
 
-INPUT_PREP_DIR = Path(__file__).resolve().parent
+SCRIPT_DIR = Path(__file__).resolve().parent
+INPUT_PREP_DIR = SCRIPT_DIR.parent
 REPO_ROOT = INPUT_PREP_DIR.parent
 DEFAULT_SETTINGS_TEMPLATE = REPO_ROOT / "configs" / "templates" / "settings_template.yaml"
 DEFAULT_RUN_ROOT = REPO_ROOT.parent / "d_drive" / "popsim" / "runs"
@@ -72,7 +73,10 @@ def resolve_config_path(path_str, config_dir):
 # set up project information from yaml
 config_path = Path(args.yaml)
 if not config_path.is_absolute():
-    config_path = INPUT_PREP_DIR / config_path
+    if config_path.exists():
+        config_path = config_path.resolve()
+    else:
+        config_path = INPUT_PREP_DIR / config_path
 if not config_path.exists():
     raise FileNotFoundError(f"Input prep config not found: {config_path}")
 

@@ -14,7 +14,8 @@ import pandas as pd
 import re
 from census import Census
 
-INPUT_PREP_DIR = Path(__file__).resolve().parent
+SCRIPT_DIR = Path(__file__).resolve().parent
+INPUT_PREP_DIR = SCRIPT_DIR.parent
 
 ######### Census Downloader  ######
 # %%

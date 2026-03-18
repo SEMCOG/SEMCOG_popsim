@@ -8,22 +8,22 @@ SEMCOG population synthesis package based on [RSG PopulationSim](https://github.
 
 A major function of SEMCOG_popsim is to prepare input configuration and dataset for PopulationSim, including project settings, controls, demographic marginals and samples for target geographies, and a geographic cross work table.
 
-### Popsim Input Maker ('/input_prep/popsim_input_maker.py')
+### Popsim Input Maker (`/input_prep/scripts/popsim_input_maker.py`)
 ##### usage: 
 ```
-  python popsim_input_maker.py key yml 
+  python input_prep/scripts/popsim_input_maker.py <census_key> input_prep/configs/<run_name>/prepare.yaml 
 
  - key: Census API key
- - yaml: input maker configuration (example: region_2019.yaml)
+ - yaml: input maker configuration (example: input_prep/configs/2024_synthesis/prepare.yaml)
 ```
 ##### Inputs:
- - *[year]\_controls\_pre\_[year].csv*: &nbsp;&nbsp;&nbsp;&nbsp;an csv table extended from PopulationSim control file ("configs/controls.csv"). Control file is a customized CSV table containing synthesis variable definitions, geographies and sample query expression. "controls_pre_year.csv" table adds a new "acs_variables" field with ACS variables and pandas expressions. Input maker will use this field to download Census marginals and compile to "targe" variables. 
- - *[year]\_region\_[year]/yaml*: &nbsp;&nbsp;&nbsp;configuration file for input_maker, including necessary input, such as PUMS data, geo equivalency files location, PUMS variable updates, etc.
- - *PUMS/*: &nbsp;&nbsp;&nbsp;folder include both PUMS households and persons for the whole region. 
+ - *input_prep/configs/<run_name>/controls_pre.csv*: &nbsp;&nbsp;&nbsp;&nbsp;an csv table extended from PopulationSim control file ("configs/controls.csv"). Control file is a customized CSV table containing synthesis variable definitions, geographies and sample query expression. "controls_pre_year.csv" table adds a new "acs_variables" field with ACS variables and pandas expressions. Input maker will use this field to download Census marginals and compile to "targe" variables. 
+ - *input_prep/configs/<run_name>/prepare.yaml*: &nbsp;&nbsp;&nbsp;configuration file for input_maker, including necessary input, such as PUMS data, geo equivalency files location, PUMS variable updates, etc.
+ - *d_drive/popsim/inputs/pums/*: &nbsp;&nbsp;&nbsp;folder include both PUMS households and persons for the whole region. 
  - *geo/*: &nbsp;&nbsp;&nbsp;folder for geographic information tables.
 
 ##### Outputs:  
- All outputs are produced to '[year]/data' folder
+ All run-ready outputs are produced to `d_drive/popsim/runs/<run_name>/` with `configs/`, `data/`, and `output/` subfolders
  - *[region]\_[year]\_geo\_cross\_walk.csv*: &nbsp;&nbsp;&nbsp;cross walk table for all geographies to be used in synthesis (PUMS, Census Block Groups, Tract, TAZ, etc);
  - *[region]\_[year]\_control\_totals\_[geo].csv*: &nbsp;&nbsp;&nbsp;control marginals at single or multiple levels;
  - *[region]\_[year]\_seed\_households.csv*: &nbsp;&nbsp;&nbsp;seed households;
@@ -33,11 +33,11 @@ A major function of SEMCOG_popsim is to prepare input configuration and dataset 
 All margional controls could be scaled to a closer-to-reality totals. For example, adjusting 2019 5-year ACS BGs to 2019 1-year ACS County totals,so the results are closer to 2019 ground 'Truth'. A 2-step process is needed to accomplish this adjustment. Using county adjustment as example:
 - Step 1. download county level control totals as adjustment targets
 ```
-  python popsim_input_control_adj.py key yml 
+  python input_prep/scripts/popsim_input_control_adj.py <census_key> input_prep/configs/<run_name>/adjust.yaml 
  - key: Census API key
- - yml: adjustment configurations (example: region_2019_control_adj.yaml)
+ - yml: adjustment configuration (example: input_prep/configs/2019_county_adjustment/adjust.yaml)
 ```
-In additon, a new county-level control file is needed. Format is similar to *[year]\_controls\_pre\_[year].csv*
+In additon, a new county-level control file is needed. Format is similar to *input_prep/configs/<run_name>/controls_pre.csv*
  - step 2. adjust the control by county totals or category totals using *adjust_to_acs1_county.py*.
 
 ### Run Population Synthesis

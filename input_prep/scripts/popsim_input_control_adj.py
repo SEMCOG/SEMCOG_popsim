@@ -2,7 +2,7 @@
 # To add a new markdown cell, type '# %% [markdown]'
 # %%
 # This program download ACS 1-year control file for adjustment purpose
-# Syntax:  > python popsim_input_control_adj.py key adj.yaml (key: Census API key; yaml: a yaml configuration file such as region.yaml)
+# Syntax:  > python input_prep/scripts/popsim_input_control_adj.py key input_prep/configs/<run_name>/adjust.yaml
 
 # Inputs:
 # [year]/region_[year]_adj.yaml  (yaml config input for input_maker.py)
@@ -18,9 +18,13 @@ import re
 import time
 import pandas as pd
 from census import Census
-import oyaml as yaml
+try:
+    import oyaml as yaml
+except ModuleNotFoundError:
+    import yaml
 from collections import defaultdict
 from input_utils import *
+from pathlib import Path
 import argparse
 import shutil
 
@@ -31,8 +35,31 @@ parser.add_argument("yaml", help="yaml configuration file name")
 args = parser.parse_args()
 t0 = time.time()
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+INPUT_PREP_DIR = SCRIPT_DIR.parent
+
+
+def resolve_config_path(path_str, config_dir):
+    path = Path(path_str)
+    if path.is_absolute():
+        return path
+    candidate = config_dir / path
+    if candidate.exists():
+        return candidate
+    candidate = INPUT_PREP_DIR / path
+    if candidate.exists():
+        return candidate
+    return INPUT_PREP_DIR.parent / path
+
 # %%
-conf = yaml.load(open("./" + args.yaml, "r"), Loader=yaml.Loader)
+config_path = Path(args.yaml)
+if not config_path.is_absolute():
+    if config_path.exists():
+        config_path = config_path.resolve()
+    else:
+        config_path = INPUT_PREP_DIR / config_path
+with open(config_path, "r") as stream:
+    conf = yaml.load(stream, Loader=yaml.Loader)
 #conf = yaml.load(open("./region_2019.yaml", "r"), Loader=yaml.Loader)
 
 # %%
@@ -41,14 +68,15 @@ prj_name = prj["name"]
 target = prj["target"]
 acs_year = prj["acs_year"]
 acs_sample = prj["acs_sample"]
-prj_folder = f"{acs_year}/"
-pre_control = prj_folder + prj["pre_control"].format(str(acs_year))
+config_dir = config_path.parent
+pre_control = resolve_config_path(prj["pre_control"].format(str(acs_year)), config_dir)
 
 geo = conf["geography"]
 state = geo["state"][0]
 counties = geo["counties"]
 
-output_folder = prj_folder + "data/"
+output_folder = config_dir / "data"
+output_folder.mkdir(parents=True, exist_ok=True)
 output_control = "{}_{}_control_totals_.csv".format(prj_name, str(acs_year))
 print(f"\n *** download {target} for year {acs_year} ***")
 
@@ -118,5 +146,5 @@ for geo, dfm in dic_margs.items():
 
     f_output_control = output_control.replace(".csv", geo.lower() + "_adj.csv")
     ctr_geos[geo] = f_output_control
-    print("  saving control file: " + output_folder + f_output_control)
-    dfm.to_csv(output_folder + f_output_control)
+    print("  saving control file: " + str(output_folder / f_output_control))
+    dfm.to_csv(output_folder / f_output_control)
