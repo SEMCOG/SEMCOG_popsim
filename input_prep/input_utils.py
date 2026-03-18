@@ -9,9 +9,12 @@ from IPython import get_ipython
 
 # %%
 import os
+from pathlib import Path
 import pandas as pd
 import re
 from census import Census
+
+INPUT_PREP_DIR = Path(__file__).resolve().parent
 
 ######### Census Downloader  ######
 # %%
@@ -123,7 +126,7 @@ def read_tract_puma_crosswalk(tup, dict_cross):
     A dataframe with the tractid column set as the index and the puma column renamed to "PUMA".
     """
 
-    df = pd.read_csv("./geo/" + dict_cross[tup], dtype=str)
+    df = pd.read_csv(INPUT_PREP_DIR / "geo" / dict_cross[tup], dtype=str)
     df["COUNTYID"] = df["STATEFP"] + df["COUNTYFP"]
     df["TRACTID"] = df["STATEFP"] + df["COUNTYFP"] + df[tup[0]]
     df = df.set_index("TRACTID")

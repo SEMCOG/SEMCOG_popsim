@@ -24,11 +24,10 @@
 # [year]/data/SEMCOG_[year]_seed_persons.csv   (PUMS person samples selected by synthesizing region)
 # [year]/data/SEMCOG_[year]_settings.yaml   (modified setting file)
 # %%
-import os
-#change working directory
-os.chdir("/home/da/populationsim/SEMCOG_popsim/input_prep")
+from pathlib import Path
 
 #%%
+import os
 import re
 import time
 import pandas as pd
@@ -47,29 +46,57 @@ parser.add_argument("yaml", help="yaml configuration file name")
 args = parser.parse_args()
 t0 = time.time()
 
+INPUT_PREP_DIR = Path(__file__).resolve().parent
+REPO_ROOT = INPUT_PREP_DIR.parent
+DEFAULT_SETTINGS_TEMPLATE = REPO_ROOT / "configs" / "templates" / "settings_template.yaml"
+
+
+def resolve_config_path(path_str, config_dir):
+    path = Path(path_str)
+    if path.is_absolute():
+        return path
+    candidate = config_dir / path
+    if candidate.exists():
+        return candidate
+    candidate = INPUT_PREP_DIR / path
+    if candidate.exists():
+        return candidate
+    return REPO_ROOT / path
+
 
 # %%
 # set up project information from yaml
-conf = yaml.load(open("./2022/prepare_2022.yaml", "r"), Loader=yaml.Loader)
+config_path = Path(args.yaml)
+if not config_path.is_absolute():
+    config_path = INPUT_PREP_DIR / config_path
+if not config_path.exists():
+    raise FileNotFoundError(f"Input prep config not found: {config_path}")
+
+with open(config_path, "r") as stream:
+    conf = yaml.load(stream, Loader=yaml.Loader)
 
 prj = conf["project"]
 prj_name = prj["name"]
 target = prj["target"]
 acs_year = prj["acs_year"]
 acs_sample = prj["acs_sample"]  # acs5 or acs1
-prj_folder = f"{acs_year}/"
-settings_file = prj_folder + prj["settings"].format(str(acs_year))
-pre_control = prj_folder + prj["pre_control"].format(str(acs_year))
-h_pums_csv = prj["h_pums_csv"]
-p_pums_csv = prj["p_pums_csv"]
+config_dir = config_path.parent
+prj_folder = config_dir
+settings_template = prj.get("settings_template")
+if settings_template:
+    settings_file = resolve_config_path(settings_template, config_dir)
+else:
+    settings_file = DEFAULT_SETTINGS_TEMPLATE
+pre_control = resolve_config_path(prj["pre_control"].format(str(acs_year)), config_dir)
+h_pums_csv = resolve_config_path(prj["h_pums_csv"], config_dir)
+p_pums_csv = resolve_config_path(prj["p_pums_csv"], config_dir)
 
 geo = conf["geography"]
 state = geo["state"][0]
 counties = geo["counties"]
 
-output_folder = prj_folder + "data/"
-if not os.path.exists(output_folder):
-    os.makedirs(output_folder)
+output_folder = prj_folder / "data"
+output_folder.mkdir(parents=True, exist_ok=True)
 output_geo_cross = "{}_{}_geo_cross_walk.csv".format(prj_name, str(acs_year))
 output_control = "{}_{}_control_totals_.csv".format(prj_name, str(acs_year))
 output_seed_hhs = "{}_{}_seed_households.csv".format(prj_name, str(acs_year))
@@ -132,8 +159,8 @@ for yrs, vals in dict_acs_pums.items():
 df_geo_cross = pd.merge(df_geo, df_tract_puma, on="TRACTID", how="left")
 df_geo_cross["REGION"] = 2
 df_geo_cross = df_geo_cross[["TRACTID", "BLKGRPID", "PUMA", "COUNTYID", "REGION"]]
-print("  saving geo cross walk to: " + output_folder + output_geo_cross)
-df_geo_cross.to_csv(output_folder + output_geo_cross)
+print("  saving geo cross walk to: " + str(output_folder / output_geo_cross))
+df_geo_cross.to_csv(output_folder / output_geo_cross)
 
 
 # %% [markdown]
@@ -203,8 +230,8 @@ for geo, dfm in dic_margs.items():
     f_output_control = output_control.replace(".csv", geo.lower() + ".csv")
     ctr_geos[geo] = f_output_control
 
-    print("  saving controls to: " + output_folder + f_output_control)
-    dfm.to_csv(output_folder + f_output_control)
+    print("  saving controls to: " + str(output_folder / f_output_control))
+    dfm.to_csv(output_folder / f_output_control)
     marginal_summary(dfm)
 
 
@@ -259,13 +286,13 @@ p_pums = pd.merge(
 )
 
 print(
-    f"- saving seed households: {output_folder+output_seed_hhs}.| total {str(len(h_pums))} records"
+    f"- saving seed households: {output_folder / output_seed_hhs}.| total {str(len(h_pums))} records"
 )
-h_pums.to_csv(output_folder + output_seed_hhs)
+h_pums.to_csv(output_folder / output_seed_hhs)
 print(
-    f"- saving seed persons: {output_folder+output_seed_persons}.| total {str(len(p_pums))} records"
+    f"- saving seed persons: {output_folder / output_seed_persons}.| total {str(len(p_pums))} records"
 )
-p_pums.to_csv(output_folder + output_seed_persons)
+p_pums.to_csv(output_folder / output_seed_persons)
 
 
 # %% [markdown]
@@ -289,7 +316,8 @@ sorted_geos.sort(key=lambda val: SORT_ORDER.index(val))
 
 
 # %%
-prj_settings = yaml.load(open(settings_file, "r"), Loader=yaml.FullLoader)
+with open(settings_file, "r") as stream:
+    prj_settings = yaml.load(stream, Loader=yaml.FullLoader)
 
 # %%
 geos = sorted_geos + ["REGION", "PUMA"]
@@ -297,7 +325,7 @@ geos.sort(key=lambda val: SORT_ORDER.index(val))
 prj_settings["geographies"] = geos  # sort by predefined order)
 prj_settings["seed_geography"] = "PUMA"
 
-prj_settings["data_dir"] = "data/" + str(acs_year)
+prj_settings["data_dir"] = f"data/{acs_year}"
 
 # %%
 for litem in prj_settings["input_table_list"]:
@@ -342,7 +370,7 @@ prj_settings["run_list"]["steps"] = (
 )
 
 with open(
-    "{}{}_{}_settings.yaml".format(output_folder, prj_name, acs_year), "w"
+    output_folder / "{}_{}_settings.yaml".format(prj_name, acs_year), "w"
 ) as yaml_file:
     yaml.dump(prj_settings, yaml_file, default_style=None, default_flow_style=False)
 
@@ -351,15 +379,14 @@ with open(
 # # copy pre control file
 print("copy popsim master control file")
 shutil.copy(
-    pre_control, output_folder + "{}_{}_controls.csv".format(prj_name, str(acs_year)),
+    pre_control, output_folder / "{}_{}_controls.csv".format(prj_name, str(acs_year)),
 )
 
 # %%
 print(
     "\ntotal time: {} seconds".format(round(time.time() - t0, 1)),
-    "\nDone. All files are saved to " + output_folder,
+    "\nDone. All files are saved to " + str(output_folder),
     "\nTo run Populationsim:",
     '\n\t copy new settings and controls to configs folder and rename "xxx_settings.yaml" to "settings.yaml"',
     f"\n\t copy other files in {acs_year}/data folder to data/{acs_year}/",
 )
-

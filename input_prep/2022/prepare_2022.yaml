@@ -7,7 +7,7 @@ project:
   target: "households"
   acs_year: 2022
   acs_sample: acs5
-  settings: "settings_{}.yaml"
+  settings_template: "configs/templates/settings_template.yaml"
   pre_control: "controls_pre_{}.csv"
   h_pums_csv: "PUMS/psam_h26_2022.csv"
   p_pums_csv: "PUMS/psam_p26_2022.csv"
