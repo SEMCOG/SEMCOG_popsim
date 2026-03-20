@@ -125,23 +125,26 @@ Household-size balancer:
 
 ### Validation
 
-Validation helper:
+Validation helper for a standard run:
 ```bash
-python /home/da/RDF2055/SEMCOG_popsim/scripts/validate_popsim_run.py \
-  --run-dir /home/da/RDF2055/d_drive/popsim/runs/2024_synthesis \
-  --write-csv
+python /home/da/RDF2055/SEMCOG_popsim/scripts/validate_popsim_run.py   --run-dir /home/da/RDF2055/d_drive/popsim/runs/2024_synthesis   --write-csv
+```
+
+Validation helper for a two-pass final output:
+```bash
+python /home/da/RDF2055/SEMCOG_popsim/scripts/validate_popsim_run.py   --output-dir /home/da/RDF2055/d_drive/popsim/runs/2024_synthesis/output/two_pass/pass2   --configs-dir /home/da/RDF2055/d_drive/popsim/runs/2024_synthesis/configs   --write-csv
 ```
 
 What it does:
 - reads `summary_<geo>.csv` or `final_summary_<geo>.csv`
 - ranks the worst controls and worst geographies
-- writes validation tables under `output/validation/`
+- writes validation tables under the validated output folder's `validation/` subfolder
 
 Validation outputs:
-- `output/validation/control_fit_summary.csv`
-- `output/validation/worst_geographies.csv`
+- `validation/control_fit_summary.csv`
+- `validation/worst_geographies.csv`
 - `output_stats_plots.ipynb` can be used for charts and histograms
-- for two-pass runs, validate the final result in `output/two_pass/pass2/`
+- for two-pass runs, point the validator at `output/two_pass/pass2/`
 
 ---
 ## 3. Forecast Refinement

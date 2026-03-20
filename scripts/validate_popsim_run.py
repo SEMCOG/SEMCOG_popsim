@@ -11,10 +11,18 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Summarize PopulationSim run quality and suggest next adjustments."
     )
-    parser.add_argument(
+    target_group = parser.add_mutually_exclusive_group(required=True)
+    target_group.add_argument(
         "--run-dir",
-        required=True,
         help="PopulationSim run folder containing configs/, data/, and output/.",
+    )
+    target_group.add_argument(
+        "--output-dir",
+        help="Specific PopulationSim output folder to validate, such as output/two_pass/pass2/.",
+    )
+    parser.add_argument(
+        "--configs-dir",
+        help="Optional configs directory used to load controls.csv when validating with --output-dir.",
     )
     parser.add_argument(
         "--top-controls",
@@ -210,9 +218,17 @@ def print_section(title: str) -> None:
 
 def main() -> None:
     args = parse_args()
-    run_dir = Path(args.run_dir).resolve()
-    configs_dir = run_dir / "configs"
-    output_dir = run_dir / "output"
+    run_dir = Path(args.run_dir).resolve() if args.run_dir else None
+    output_dir = Path(args.output_dir).resolve() if args.output_dir else None
+
+    if run_dir is not None:
+        configs_dir = run_dir / "configs"
+        output_dir = run_dir / "output"
+        target_label = str(run_dir)
+    else:
+        assert output_dir is not None
+        configs_dir = Path(args.configs_dir).resolve() if args.configs_dir else None
+        target_label = str(output_dir)
 
     summary_files = find_summary_files(output_dir)
     if not summary_files:
@@ -232,10 +248,10 @@ def main() -> None:
             worst_by_control[f"{summary_geo_name(path)}::{control}"] = df
 
     metrics = pd.concat(metrics_frames, ignore_index=True) if metrics_frames else pd.DataFrame()
-    controls_df = load_controls(configs_dir)
+    controls_df = load_controls(configs_dir) if configs_dir is not None else None
 
     print_section("Run")
-    print(run_dir)
+    print(target_label)
     print("summary files:")
     for path in summary_files:
         print(f"- {path.name}")
