@@ -74,9 +74,12 @@ Notes:
 
 ##### *(Optional)* household size rebalance:
 - To adjust household size and solve the over sized 7+ HHs issue, a rebalance process is needed.
-- `scripts/archive/hh_size_balancer.py` will need a household-size control file and the output summary file to create a new control file with new household size distribution.
-- Rerun PopulationSim with new household sizes.
-- Repeat this process as needed.
+- `input_prep/scripts/hh_size_balancer.py` can create an adjusted block-group control file from a completed run summary while preserving total households and persons.
+- The default method is `shape_preserving`, which keeps the adjusted household-size curve closer to the original Census controls while reconciling person totals.
+- The older upward-shifting heuristic is still available as `--method legacy` when you want to reproduce the previous behavior.
+- It can reuse the same run config via `--config input_prep/configs/<run_name>/prepare.yaml` and reads optional defaults from `postprocess.hh_size_balancer`.
+- By default it writes a non-destructive adjusted control file such as `*_control_totals_blkgrp_hhsize_adj.csv` plus diagnostics under `output/validation/`.
+- Rerun PopulationSim against the adjusted control file if the first-pass validation shows a poor fit for large household sizes.
 
 ### Results and visualization
 - `output/` has synthetic households, persons and one or more `summary_<geo>.csv` files.
