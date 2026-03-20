@@ -9,20 +9,23 @@ SEMCOG population synthesis package based on [RSG PopulationSim](https://github.
 A major function of `SEMCOG_popsim` is to prepare PopulationSim run packages, including project settings, controls, demographic marginals, PUMS seed samples, and a geographic crosswalk table.
 
 ### Popsim Input Maker (`/input_prep/scripts/popsim_input_maker.py`)
-##### Usage
+
+#### Usage
 ```
   python input_prep/scripts/popsim_input_maker.py <census_key> input_prep/configs/<run_name>/prepare.yaml 
 
  - key: Census API key
  - yaml: input maker configuration (example: input_prep/configs/2024_synthesis/prepare.yaml)
 ```
-##### Inputs
+
+#### Inputs
 - `input_prep/configs/<run_name>/prepare.yaml`: input-maker configuration, including target year, run name, PUMS paths, and variable updates.
 - `input_prep/configs/<run_name>/controls_pre.csv`: extended PopulationSim control specification. This adds an `acs_variables` field used to download and compile Census marginals into PopulationSim control fields.
 - `d_drive/popsim/inputs/pums/`: shared PUMS source data for all runs.
 - `input_prep/geo/`: shared geographic equivalency and tract-to-PUMA crosswalk files.
 
-##### Outputs
+
+#### Outputs
 All run-ready outputs are produced to `d_drive/popsim/runs/<run_name>/` with `configs/`, `data/`, and `output/` subfolders.
 - `[region]_[year]_geo_cross_walk.csv`: crosswalk table for synthesis geographies.
 - `[region]_[year]_control_totals_[geo].csv`: compiled control marginals by geography.
@@ -31,7 +34,8 @@ All run-ready outputs are produced to `d_drive/popsim/runs/<run_name>/` with `co
 - `configs/settings.yaml`: generated PopulationSim runtime settings.
 - `configs/controls.csv`: generated PopulationSim runtime control specification.
 
-##### *(Optional)* Adjustments:
+
+#### Optional Control Adjustments
 All margional controls could be scaled to a closer-to-reality totals. For example, adjusting 2019 5-year ACS BGs to 2019 1-year ACS County totals,so the results are closer to 2019 ground 'Truth'. A 2-step process is needed to accomplish this adjustment. Using county adjustment as example:
 - Step 1. download county level control totals as adjustment targets
 ```
@@ -42,7 +46,9 @@ All margional controls could be scaled to a closer-to-reality totals. For exampl
 In additon, a new county-level control file is needed. Format is similar to `input_prep/configs/<run_name>/controls_pre.csv`.
 - Step 2. adjust the control by county totals or category totals using `adjust_to_acs1_county.py`.
 
-### Run Population Synthesis
+---
+## 2. Run Population Synthesis
+
 Use the PopulationSim CLI against a generated run package under `d_drive/popsim/runs/<run_name>/`.
 
 Validated run package structure:
@@ -67,12 +73,18 @@ Reusable shell runner:
 ./scripts/run_2024_synthesis.sh
 ```
 
+Two-pass workflow with household-size rebalancing:
+```bash
+python /home/da/RDF2055/SEMCOG_popsim/scripts/run_two_pass_hhsize.py \
+  --config /home/da/RDF2055/SEMCOG_popsim/input_prep/configs/2024_synthesis/prepare.yaml
+```
+
 Notes:
 - the generated settings file uses `data_dir: data`, so the CLI should point `-d` to the run package data folder
 - `scripts/run_2024_synthesis.sh` is the current SEMCOG helper for the full 2024 run and log setup
 - older root-level runner scripts have been moved to `scripts/archive/`
 
-##### *(Optional)* household size rebalance:
+### Optional Household Size Rebalance
 - To adjust household size and solve the over sized 7+ HHs issue, a rebalance process is needed.
 - `input_prep/scripts/hh_size_balancer.py` can create an adjusted block-group control file from a completed run summary while preserving total households and persons.
 - The default method is `shape_preserving`, which keeps the adjusted household-size curve closer to the original Census controls while reconciling person totals.
@@ -82,17 +94,17 @@ Notes:
 - Rerun PopulationSim against the adjusted control file if the first-pass validation shows a poor fit for large household sizes.
 - For a dedicated automated two-pass workflow, use `python scripts/run_two_pass_hhsize.py --config input_prep/configs/<run_name>/prepare.yaml`. This runs pass 1, applies the household-size balancer in place with a backup of the original control file, and then runs pass 2 into `output/two_pass/<timestamp>/`.
 
-### Results and visualization
+### Results and Validation
 - `output/` has synthetic households, persons and one or more `summary_<geo>.csv` files.
 - `output_stats_plots.ipynb` could be used to generate [error plot](https://raw.githubusercontent.com/SEMCOG/SEMCOG_popsim/master/validation/semcog_python/synpop_popsim_error_plot.png) and [histograms](https://github.com/SEMCOG/SEMCOG_popsim/blob/master/validation/semcog_python/popsim_oakland_BLKGRP__histograms.html).
 
 ---
-## 2. Forecast Refinement
+## 3. Forecast Refinement
 SEMCOG tested using PopulationSim as refinement tool for UrbanSim model.
 
 `urbansim_refine_input("refinement/urbansim_refine_input.ipynb")` script uses model data to prepare inputs for the refinement process.
 
-### Test Inputs
+### Refinement Inputs
 Similar inputs to population synthesis are expected
 1. settings: with manual updates;
 2. controls: `urbansim_refine_input` extracts and compiles information from annual household control totals from the forecast model;
