@@ -80,6 +80,7 @@ Notes:
 - It can reuse the same run config via `--config input_prep/configs/<run_name>/prepare.yaml` and reads optional defaults from `postprocess.hh_size_balancer`.
 - By default it writes a non-destructive adjusted control file such as `*_control_totals_blkgrp_hhsize_adj.csv` plus diagnostics under `output/validation/`.
 - Rerun PopulationSim against the adjusted control file if the first-pass validation shows a poor fit for large household sizes.
+- For a dedicated automated two-pass workflow, use `python scripts/run_two_pass_hhsize.py --config input_prep/configs/<run_name>/prepare.yaml`. This runs pass 1, applies the household-size balancer in place with a backup of the original control file, and then runs pass 2 into `output/two_pass/<timestamp>/`.
 
 ### Results and visualization
 - `output/` has synthetic households, persons and one or more `summary_<geo>.csv` files.
