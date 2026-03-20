@@ -60,6 +60,8 @@ Validated run package structure:
 - `data/xxx_seed_persons.csv`
 - `output/`
 
+### One-Pass Workflow
+
 CLI example:
 ```bash
 populationsim \
@@ -68,35 +70,78 @@ populationsim \
   -o /home/da/RDF2055/d_drive/popsim/runs/2024_synthesis/output
 ```
 
-Reusable shell runner:
+Shell runner:
 ```bash
 ./scripts/run_2024_synthesis.sh
 ```
 
-Two-pass workflow with household-size rebalancing:
+One-pass output structure:
+- `output/summary_<geo>.csv` or `output/final_summary_<geo>.csv`
+- `output/synthetic_households.csv`
+- `output/synthetic_persons.csv`
+- `output/pipeline.h5`
+- `output/timing_log.csv`
+- `output/logs/`
+- `output/validation/`
+- `output/archive/run_<n>/` for archived one-pass outputs from prior runs
+
+One-pass notes:
+- the generated settings file uses `data_dir: data`, so the CLI should point `-d` to the run package data folder
+- `scripts/run_2024_synthesis.sh` archives existing one-pass output into `output/archive/run_<n>/` before starting a new run
+- `scripts/run_2024_synthesis.sh` does not archive `output/two_pass/`; that workflow is managed separately
+
+### Two-Pass Workflow
+
+Two-pass command:
 ```bash
 python /home/da/RDF2055/SEMCOG_popsim/scripts/run_two_pass_hhsize.py \
   --config /home/da/RDF2055/SEMCOG_popsim/input_prep/configs/2024_synthesis/prepare.yaml
 ```
 
-Notes:
-- the generated settings file uses `data_dir: data`, so the CLI should point `-d` to the run package data folder
-- `scripts/run_2024_synthesis.sh` is the current SEMCOG helper for the full 2024 run and log setup
-- older root-level runner scripts have been moved to `scripts/archive/`
+Purpose:
+- use a first synthesis run to diagnose unrealistic household-size fit, especially the `7+` tail
+- rebalance block-group household-size controls while preserving household and person totals as closely as possible
+- rerun synthesis with the adjusted control file
 
-### Optional Household Size Rebalance
-- To adjust household size and solve the over sized 7+ HHs issue, a rebalance process is needed.
-- `input_prep/scripts/hh_size_balancer.py` can create an adjusted block-group control file from a completed run summary while preserving total households and persons.
-- The default method is `shape_preserving`, which keeps the adjusted household-size curve closer to the original Census controls while reconciling person totals.
-- The older upward-shifting heuristic is still available as `--method legacy` when you want to reproduce the previous behavior.
-- It can reuse the same run config via `--config input_prep/configs/<run_name>/prepare.yaml` and reads optional defaults from `postprocess.hh_size_balancer`.
-- By default it writes a non-destructive adjusted control file such as `*_control_totals_blkgrp_hhsize_adj.csv` plus diagnostics under `output/validation/`.
-- Rerun PopulationSim against the adjusted control file if the first-pass validation shows a poor fit for large household sizes.
-- For a dedicated automated two-pass workflow, use `python scripts/run_two_pass_hhsize.py --config input_prep/configs/<run_name>/prepare.yaml`. This runs pass 1, applies the household-size balancer in place with a backup of the original control file, and then runs pass 2 into `output/two_pass/<timestamp>/`.
+Workflow:
+- pass 1 writes outputs to `output/two_pass/pass1/`
+- `input_prep/scripts/hh_size_balancer.py` adjusts the block-group control file in place for pass 2
+- pass 2 writes final outputs to `output/two_pass/pass2/`
+- previous two-pass results are archived to `output/two_pass/run_<n>/`
 
-### Results and Validation
-- `output/` has synthetic households, persons and one or more `summary_<geo>.csv` files.
-- `output_stats_plots.ipynb` could be used to generate [error plot](https://raw.githubusercontent.com/SEMCOG/SEMCOG_popsim/master/validation/semcog_python/synpop_popsim_error_plot.png) and [histograms](https://github.com/SEMCOG/SEMCOG_popsim/blob/master/validation/semcog_python/popsim_oakland_BLKGRP__histograms.html).
+Output structure:
+- `output/two_pass/pass1/`
+- `output/two_pass/pass2/`
+- `output/two_pass/logs/`
+- `output/two_pass/validation/`
+- `output/two_pass/run_<n>/`
+
+Household-size balancer:
+- script: `input_prep/scripts/hh_size_balancer.py`
+- default method: `shape_preserving`
+- legacy option: `--method legacy`
+- review copies of the adjusted and pre-balancer control files are saved under `output/two_pass/validation/`
+- use the balancer directly when you want to inspect or apply the household-size adjustment without running the full two-pass workflow
+
+### Validation
+
+Validation helper:
+```bash
+python /home/da/RDF2055/SEMCOG_popsim/scripts/validate_popsim_run.py \
+  --run-dir /home/da/RDF2055/d_drive/popsim/runs/2024_synthesis \
+  --write-csv
+```
+
+What it does:
+- reads `summary_<geo>.csv` or `final_summary_<geo>.csv`
+- ranks the worst controls and worst geographies
+- writes validation tables under `output/validation/`
+
+Validation outputs:
+- `output/validation/control_fit_summary.csv`
+- `output/validation/worst_geographies.csv`
+- `output_stats_plots.ipynb` can be used for charts and histograms
+- for two-pass runs, validate the final result in `output/two_pass/pass2/`
 
 ---
 ## 3. Forecast Refinement
