@@ -94,8 +94,7 @@ One-pass notes:
 
 Two-pass command:
 ```bash
-python /home/da/RDF2055/SEMCOG_popsim/scripts/run_two_pass_hhsize.py \
-  --config /home/da/RDF2055/SEMCOG_popsim/input_prep/configs/2024_synthesis/prepare.yaml
+python scripts/run_two_pass_hhsize.py --run-name 2024_synthesis
 ```
 
 Purpose:
@@ -127,12 +126,12 @@ Household-size balancer:
 
 Validation helper for a standard run:
 ```bash
-python /home/da/RDF2055/SEMCOG_popsim/scripts/validate_popsim_run.py   --run-dir /home/da/RDF2055/d_drive/popsim/runs/2024_synthesis   --write-csv
+python scripts/validate_popsim_run.py --run-name 2024_synthesis --write-csv
 ```
 
 Validation helper for a two-pass final output:
 ```bash
-python /home/da/RDF2055/SEMCOG_popsim/scripts/validate_popsim_run.py   --output-dir /home/da/RDF2055/d_drive/popsim/runs/2024_synthesis/output/two_pass/pass2   --configs-dir /home/da/RDF2055/d_drive/popsim/runs/2024_synthesis/configs   --write-csv
+python scripts/validate_popsim_run.py --run-name 2024_synthesis --two-pass --write-csv
 ```
 
 What it does:

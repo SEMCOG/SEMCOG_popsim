@@ -18,8 +18,10 @@ except ModuleNotFoundError:
 REPO_ROOT = Path(__file__).resolve().parents[1]
 INPUT_PREP_DIR = REPO_ROOT / "input_prep"
 BALANCER_SCRIPT = INPUT_PREP_DIR / "scripts" / "hh_size_balancer.py"
-DEFAULT_CONFIG = INPUT_PREP_DIR / "configs" / "2024_synthesis" / "prepare.yaml"
+DEFAULT_RUN_NAME = "2024_synthesis"
+DEFAULT_CONFIG = INPUT_PREP_DIR / "configs" / DEFAULT_RUN_NAME / "prepare.yaml"
 DEFAULT_METHOD = "shape_preserving"
+DEFAULT_RUN_ROOT = REPO_ROOT.parent / "d_drive" / "popsim" / "runs"
 
 
 def resolve_config_path(path_str: str | None, config_dir: Path) -> Path | None:
@@ -35,6 +37,14 @@ def resolve_config_path(path_str: str | None, config_dir: Path) -> Path | None:
     if candidate.exists():
         return candidate
     return REPO_ROOT / path
+
+
+def default_config_for_run_name(run_name: str) -> Path:
+    return INPUT_PREP_DIR / "configs" / run_name / "prepare.yaml"
+
+
+def default_run_dir_for_run_name(run_name: str) -> Path:
+    return DEFAULT_RUN_ROOT / run_name
 
 
 def load_yaml_config(config_path: Path) -> dict[str, Any]:
@@ -82,8 +92,6 @@ def write_status(path: Path, status: str, exit_code: int = 0) -> None:
     path.write_text(f"status={status}\nexit_code={exit_code}\n")
 
 
-
-
 def archive_existing_two_pass_outputs(workflow_dir: Path) -> Path | None:
     tracked = ["pass1", "pass2", "logs", "validation"]
     existing = [workflow_dir / name for name in tracked if (workflow_dir / name).exists()]
@@ -100,6 +108,8 @@ def archive_existing_two_pass_outputs(workflow_dir: Path) -> Path | None:
         shutil.move(str(source), str(archive_dir / source.name))
 
     return archive_dir
+
+
 def log(message: str, workflow_log: Path) -> None:
     line = f"[{datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}] {message}"
     print(line)
@@ -135,14 +145,19 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run PopulationSim in a two-pass workflow with household-size rebalancing between passes."
     )
-    parser.add_argument(
+    target_group = parser.add_mutually_exclusive_group()
+    target_group.add_argument(
+        "--run-name",
+        default=DEFAULT_RUN_NAME,
+        help="Short run name under input_prep/configs/ and d_drive/popsim/runs/ (default: 2024_synthesis)",
+    )
+    target_group.add_argument(
         "--config",
-        default=str(DEFAULT_CONFIG),
         help="prepare.yaml used to derive the run folder and balancer defaults",
     )
-    parser.add_argument(
+    target_group.add_argument(
         "--run-dir",
-        help="PopulationSim run folder; overrides the run folder derived from --config",
+        help="PopulationSim run folder; overrides config and run-name lookup",
     )
     parser.add_argument(
         "--method",
@@ -158,12 +173,23 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def resolve_run_context(args: argparse.Namespace) -> tuple[Path | None, dict[str, Any], Path]:
+    if args.run_dir:
+        return None, {}, Path(args.run_dir).resolve()
+    if args.config:
+        config_path = Path(args.config).resolve()
+        return config_path, load_yaml_config(config_path), derive_run_dir(config_path, load_yaml_config(config_path))
+
+    config_path = default_config_for_run_name(args.run_name)
+    if config_path.exists():
+        conf = load_yaml_config(config_path)
+        return config_path, conf, derive_run_dir(config_path, conf)
+    return None, {}, default_run_dir_for_run_name(args.run_name)
+
+
 def main() -> int:
     args = parse_args()
-
-    config_path = Path(args.config).resolve() if args.config else None
-    config = load_yaml_config(config_path) if config_path else {}
-    run_dir = Path(args.run_dir).resolve() if args.run_dir else derive_run_dir(config_path, config)
+    config_path, config, run_dir = resolve_run_context(args)
 
     config_dir = run_dir / "configs"
     data_dir = run_dir / "data"
@@ -238,9 +264,8 @@ def main() -> int:
         write_status(overall_status, "failed_balancer", balancer_status)
         return balancer_status
 
-    adjusted_control_file = control_file
-    review_adjusted_control = validation_dir / adjusted_control_file.name
-    shutil.copy2(adjusted_control_file, review_adjusted_control)
+    review_adjusted_control = validation_dir / control_file.name
+    shutil.copy2(control_file, review_adjusted_control)
     log(f"Saved adjusted control review copy: {review_adjusted_control}", workflow_log)
 
     if backup_file.exists():

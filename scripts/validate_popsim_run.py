@@ -7,11 +7,25 @@ import numpy as np
 import pandas as pd
 
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_RUN_ROOT = REPO_ROOT.parent / "d_drive" / "popsim" / "runs"
+DEFAULT_RUN_NAME = "2024_synthesis"
+
+
+def default_run_dir_for_run_name(run_name: str) -> Path:
+    return DEFAULT_RUN_ROOT / run_name
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Summarize PopulationSim run quality and suggest next adjustments."
     )
-    target_group = parser.add_mutually_exclusive_group(required=True)
+    target_group = parser.add_mutually_exclusive_group()
+    target_group.add_argument(
+        "--run-name",
+        default=DEFAULT_RUN_NAME,
+        help="Short run name under d_drive/popsim/runs/ (default: 2024_synthesis)",
+    )
     target_group.add_argument(
         "--run-dir",
         help="PopulationSim run folder containing configs/, data/, and output/.",
@@ -23,6 +37,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--configs-dir",
         help="Optional configs directory used to load controls.csv when validating with --output-dir.",
+    )
+    parser.add_argument(
+        "--two-pass",
+        action="store_true",
+        help="When used with --run-name, validate output/two_pass/pass2 instead of the standard output/ folder.",
     )
     parser.add_argument(
         "--top-controls",
@@ -216,19 +235,24 @@ def print_section(title: str) -> None:
     print("-" * len(title))
 
 
+def resolve_validation_target(args: argparse.Namespace) -> tuple[str, Path, Path | None]:
+    if args.run_dir:
+        run_dir = Path(args.run_dir).resolve()
+        return str(run_dir), run_dir / "output", run_dir / "configs"
+    if args.output_dir:
+        output_dir = Path(args.output_dir).resolve()
+        configs_dir = Path(args.configs_dir).resolve() if args.configs_dir else None
+        return str(output_dir), output_dir, configs_dir
+
+    run_dir = default_run_dir_for_run_name(args.run_name)
+    if args.two_pass:
+        return str(run_dir / "output" / "two_pass" / "pass2"), run_dir / "output" / "two_pass" / "pass2", run_dir / "configs"
+    return str(run_dir), run_dir / "output", run_dir / "configs"
+
+
 def main() -> None:
     args = parse_args()
-    run_dir = Path(args.run_dir).resolve() if args.run_dir else None
-    output_dir = Path(args.output_dir).resolve() if args.output_dir else None
-
-    if run_dir is not None:
-        configs_dir = run_dir / "configs"
-        output_dir = run_dir / "output"
-        target_label = str(run_dir)
-    else:
-        assert output_dir is not None
-        configs_dir = Path(args.configs_dir).resolve() if args.configs_dir else None
-        target_label = str(output_dir)
+    target_label, output_dir, configs_dir = resolve_validation_target(args)
 
     summary_files = find_summary_files(output_dir)
     if not summary_files:
@@ -275,22 +299,21 @@ def main() -> None:
     print(worst_controls.loc[:, cols].to_string(index=False, float_format=lambda x: f"{x:,.2f}"))
 
     print_section("Worst Geographies")
-    for _, row in worst_controls.head(min(5, len(worst_controls))).iterrows():
+    for _, row in worst_controls.iterrows():
         key = f"{row['geography']}::{row['control']}"
         df = worst_by_control.get(key)
         if df is None or df.empty:
             continue
-        print(f"{row['control']} ({row['geography']})")
+        print(f"\n{row['geography']} :: {row['control']}")
         print(df.head(args.top_geos).to_string(index=False, float_format=lambda x: f"{x:,.2f}"))
-        print()
 
     print_section("Suggested Adjustments")
-    for item in suggest_adjustments(metrics, controls_df):
-        print(f"- {item}")
+    for suggestion in suggest_adjustments(metrics, controls_df):
+        print(f"- {suggestion}")
 
     if args.write_csv:
         written = maybe_write_csv(output_dir, metrics, worst_by_control)
-        print_section("Wrote CSVs")
+        print_section("Written Files")
         for path in written:
             print(f"- {path}")
 
