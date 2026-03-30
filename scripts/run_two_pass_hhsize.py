@@ -5,7 +5,7 @@ import argparse
 import shutil
 import subprocess
 import sys
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -92,26 +92,14 @@ def write_status(path: Path, status: str, exit_code: int = 0) -> None:
     path.write_text(f"status={status}\nexit_code={exit_code}\n")
 
 
-def archive_existing_two_pass_outputs(workflow_dir: Path) -> Path | None:
-    tracked = ["pass1", "pass2", "logs", "validation"]
-    existing = [workflow_dir / name for name in tracked if (workflow_dir / name).exists()]
-    if not existing:
-        return None
-
-    run_index = 1
-    while (workflow_dir / f"run_{run_index}").exists():
-        run_index += 1
-    archive_dir = workflow_dir / f"run_{run_index}"
-    archive_dir.mkdir(parents=True, exist_ok=False)
-
-    for source in existing:
-        shutil.move(str(source), str(archive_dir / source.name))
-
-    return archive_dir
+def run_stamp(dt: datetime | None = None) -> str:
+    if dt is None:
+        dt = datetime.now().astimezone()
+    return dt.strftime("%Y-%m-%d_%H")
 
 
 def log(message: str, workflow_log: Path) -> None:
-    line = f"[{datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')}] {message}"
+    line = f"[{datetime.now().astimezone().strftime('%Y-%m-%d %H:%M:%S')}] {message}"
     print(line)
     with open(workflow_log, "a") as stream:
         stream.write(line + "\n")
@@ -178,7 +166,8 @@ def resolve_run_context(args: argparse.Namespace) -> tuple[Path | None, dict[str
         return None, {}, Path(args.run_dir).resolve()
     if args.config:
         config_path = Path(args.config).resolve()
-        return config_path, load_yaml_config(config_path), derive_run_dir(config_path, load_yaml_config(config_path))
+        conf = load_yaml_config(config_path)
+        return config_path, conf, derive_run_dir(config_path, conf)
 
     config_path = default_config_for_run_name(args.run_name)
     if config_path.exists():
@@ -193,12 +182,11 @@ def main() -> int:
 
     config_dir = run_dir / "configs"
     data_dir = run_dir / "data"
-    output_dir = run_dir / "output"
+    output_root = run_dir / "output"
     control_file = find_blockgroup_control_file(data_dir)
     backup_file = backup_path_for(control_file)
 
-    workflow_dir = output_dir / "two_pass"
-    archived_run_dir = archive_existing_two_pass_outputs(workflow_dir)
+    workflow_dir = output_root / f"{run_stamp()}_two_pass"
     pass1_output = workflow_dir / "pass1"
     pass2_output = workflow_dir / "pass2"
     logs_dir = workflow_dir / "logs"
@@ -214,8 +202,7 @@ def main() -> int:
     workflow_log.write_text("")
 
     log(f"Two-pass workflow started for {run_dir}", workflow_log)
-    if archived_run_dir is not None:
-        log(f"Archived previous two-pass outputs to {archived_run_dir}", workflow_log)
+    log(f"Workflow dir: {workflow_dir}", workflow_log)
     log(f"Control file: {control_file}", workflow_log)
     log(f"Balancer method: {args.method}", workflow_log)
 
