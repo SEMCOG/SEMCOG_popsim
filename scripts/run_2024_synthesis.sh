@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
+# Run the standard one-pass PopulationSim synthesis for the 2024 package.
+#
+# This wrapper keeps the command predictable for daily use:
+# - reads the base run configs from the run package configs folder
+# - writes model outputs under output/<YYYY-MM-DD>_<HH>_one_pass/run
+# - writes wrapper logs/status under output/<YYYY-MM-DD>_<HH>_one_pass/logs
+# Environment variables can override paths when a one-off run needs a
+# different package or output location.
 RUN_DIR="${RUN_DIR:-/home/da/RDF2055/d_drive/popsim/runs/2024_synthesis}"
 CONFIG_DIR="${CONFIG_DIR:-$RUN_DIR/configs}"
 DATA_DIR="${DATA_DIR:-$RUN_DIR/data}"
@@ -16,10 +24,12 @@ STATUS_FILE="${STATUS_FILE:-$LOG_DIR/run.status}"
 
 mkdir -p "$RUN_OUTPUT_DIR" "$LOG_DIR" "$VALIDATION_DIR"
 
+# Mirror each wrapper message to both the terminal and the run log.
 log() {
   printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" | tee -a "$LOG_FILE"
 }
 
+# Record a clear status file if the shell receives Ctrl-C or a terminate signal.
 on_interrupt() {
   log "Run interrupted by signal."
   printf 'status=interrupted\n' > "$STATUS_FILE"

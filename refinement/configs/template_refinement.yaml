@@ -1,0 +1,17 @@
+project:
+  name: 2024_refine
+  year: "2045"
+  target_geography: TAZ
+  sample_geography: MCD
+
+paths:
+  input_hdf: path/to/base_run.h5
+  target_hdf: path/to/target_run.h5
+  output_root: ../../d_drive/popsim/runs
+  settings_template: ../../configs/templates/refinement_settings_template.yaml
+
+options:
+  sampling_method: ALL
+  weight_col: residential_units
+  new_id_base: 20000000000
+  add_person_controls: false

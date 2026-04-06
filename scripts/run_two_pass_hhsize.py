@@ -1,4 +1,14 @@
 #!/usr/bin/env python3
+"""Run a two-pass PopulationSim workflow with household-size rebalancing.
+
+The workflow keeps the base input package immutable:
+1. Pass 1 uses a copied settings folder that points to the base BLKGRP controls.
+2. The household-size balancer writes a separate *_hhsize_adj.csv control file.
+3. Pass 2 uses a copied settings folder that points to that adjusted control file.
+
+Outputs are written under output/<YYYY-MM-DD>_<HH>_two_pass/ so each run has
+its own logs, pass outputs, copied configs, and validation artifacts.
+"""
 from __future__ import annotations
 
 import argparse
@@ -25,6 +35,7 @@ DEFAULT_RUN_ROOT = REPO_ROOT.parent / "d_drive" / "popsim" / "runs"
 
 
 def resolve_config_path(path_str: str | None, config_dir: Path) -> Path | None:
+    """Resolve a config path relative to the prepare config, input_prep, or repo root."""
     if not path_str:
         return None
     path = Path(path_str)
@@ -40,19 +51,23 @@ def resolve_config_path(path_str: str | None, config_dir: Path) -> Path | None:
 
 
 def default_config_for_run_name(run_name: str) -> Path:
+    """Return the default prepare.yaml path for a named run."""
     return INPUT_PREP_DIR / "configs" / run_name / "prepare.yaml"
 
 
 def default_run_dir_for_run_name(run_name: str) -> Path:
+    """Return the default generated PopulationSim package directory for a named run."""
     return DEFAULT_RUN_ROOT / run_name
 
 
 def load_yaml_config(config_path: Path) -> dict[str, Any]:
+    """Load a YAML config while preserving the repo's oyaml preference when available."""
     with open(config_path, "r") as stream:
         return yaml.load(stream, Loader=yaml.Loader)
 
 
 def derive_run_dir(config_path: Path, conf: dict[str, Any]) -> Path:
+    """Derive the generated run package path from prepare.yaml."""
     config_dir = config_path.parent
     run_name = conf["project"].get("run_name", f"{conf['project']['acs_year']}_synthesis")
     run_root = resolve_config_path(conf.get("paths", {}).get("run_root"), config_dir)
@@ -62,6 +77,7 @@ def derive_run_dir(config_path: Path, conf: dict[str, Any]) -> Path:
 
 
 def find_blockgroup_control_file(data_dir: Path) -> Path:
+    """Find the base BLKGRP control file, excluding adjusted and backup copies."""
     candidates = []
     for path in sorted(data_dir.glob("*_control_totals_blkgrp.csv")):
         name = path.name
@@ -75,11 +91,33 @@ def find_blockgroup_control_file(data_dir: Path) -> Path:
     return candidates[0]
 
 
-def backup_path_for(control_file: Path) -> Path:
-    return control_file.with_name(f"{control_file.stem}_pre_balancer{control_file.suffix}")
+def adjusted_path_for(control_file: Path, suffix: str = "_hhsize_adj") -> Path:
+    """Return the path where the balancer should write adjusted BLKGRP controls."""
+    return control_file.with_name(f"{control_file.stem}{suffix}{control_file.suffix}")
+
+
+def copy_config_dir(source_config_dir: Path, destination_config_dir: Path) -> None:
+    """Copy the run config directory so pass-specific settings can be edited safely."""
+    destination_config_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(source_config_dir, destination_config_dir, dirs_exist_ok=True)
+
+
+def update_blkgrp_control_filename(settings_path: Path, control_filename: str) -> None:
+    """Point BLKGRP_control_data in a copied settings.yaml to a chosen control file."""
+    settings = load_yaml_config(settings_path)
+    for table_item in settings.get("input_table_list", []):
+        if table_item.get("tablename") == "BLKGRP_control_data":
+            table_item["filename"] = control_filename
+            break
+    else:
+        raise KeyError(f"Could not find BLKGRP_control_data in {settings_path}")
+
+    with open(settings_path, "w") as stream:
+        yaml.dump(settings, stream, default_flow_style=False, sort_keys=False)
 
 
 def resolve_summary_file(pass1_output: Path) -> Path:
+    """Find the BLKGRP summary produced by pass 1 for the household-size balancer."""
     for name in ["final_summary_BLKGRP.csv", "summary_BLKGRP.csv"]:
         candidate = pass1_output / name
         if candidate.exists():
@@ -88,17 +126,20 @@ def resolve_summary_file(pass1_output: Path) -> Path:
 
 
 def write_status(path: Path, status: str, exit_code: int = 0) -> None:
+    """Write a small status file for workflow and step monitoring."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(f"status={status}\nexit_code={exit_code}\n")
 
 
 def run_stamp(dt: datetime | None = None) -> str:
+    """Return the hourly run stamp used in output folder names."""
     if dt is None:
         dt = datetime.now().astimezone()
     return dt.strftime("%Y-%m-%d_%H")
 
 
 def log(message: str, workflow_log: Path) -> None:
+    """Write a workflow message to the terminal and workflow log."""
     line = f"[{datetime.now().astimezone().strftime('%Y-%m-%d %H:%M:%S')}] {message}"
     print(line)
     with open(workflow_log, "a") as stream:
@@ -106,6 +147,7 @@ def log(message: str, workflow_log: Path) -> None:
 
 
 def run_command(cmd: list[str], log_path: Path, status_path: Path, workflow_log: Path, cwd: Path | None = None) -> int:
+    """Run a subprocess, stream output to a log, and write a step status file."""
     log(f"Running: {' '.join(cmd)}", workflow_log)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with open(log_path, "w") as log_stream:
@@ -130,6 +172,7 @@ def run_command(cmd: list[str], log_path: Path, status_path: Path, workflow_log:
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse the minimal CLI for choosing the run package and balancer method."""
     parser = argparse.ArgumentParser(
         description="Run PopulationSim in a two-pass workflow with household-size rebalancing between passes."
     )
@@ -153,15 +196,11 @@ def parse_args() -> argparse.Namespace:
         choices=["shape_preserving", "legacy"],
         help="Household-size balancer method",
     )
-    parser.add_argument(
-        "--skip-restore-original",
-        action="store_true",
-        help="Do not restore the base control file from *_pre_balancer before pass 1",
-    )
     return parser.parse_args()
 
 
 def resolve_run_context(args: argparse.Namespace) -> tuple[Path | None, dict[str, Any], Path]:
+    """Resolve config metadata and the generated run directory from CLI arguments."""
     if args.run_dir:
         return None, {}, Path(args.run_dir).resolve()
     if args.config:
@@ -177,6 +216,7 @@ def resolve_run_context(args: argparse.Namespace) -> tuple[Path | None, dict[str
 
 
 def main() -> int:
+    """Coordinate pass 1, household-size balancing, and pass 2."""
     args = parse_args()
     config_path, config, run_dir = resolve_run_context(args)
 
@@ -184,7 +224,10 @@ def main() -> int:
     data_dir = run_dir / "data"
     output_root = run_dir / "output"
     control_file = find_blockgroup_control_file(data_dir)
-    backup_file = backup_path_for(control_file)
+
+    config_options = config.get("postprocess", {}).get("hh_size_balancer", {}) if config else {}
+    adjusted_suffix = config_options.get("adjusted_suffix", "_hhsize_adj")
+    adjusted_control_file = adjusted_path_for(control_file, adjusted_suffix)
 
     workflow_dir = output_root / f"{run_stamp()}_two_pass"
     pass1_output = workflow_dir / "pass1"
@@ -193,27 +236,34 @@ def main() -> int:
     workflow_log = logs_dir / "workflow.log"
     overall_status = logs_dir / "workflow.status"
     validation_dir = workflow_dir / "validation"
+    workflow_config_dir = workflow_dir / "configs"
+    pass1_config_dir = workflow_config_dir / "pass1"
+    pass2_config_dir = workflow_config_dir / "pass2"
     balancer_diagnostics = validation_dir / f"{control_file.stem}_{args.method}_diagnostics.csv"
 
+    # Pass 1 and pass 2 get independent config copies. Only pass 2 is edited to
+    # use the adjusted BLKGRP controls produced after pass 1.
     logs_dir.mkdir(parents=True, exist_ok=True)
     validation_dir.mkdir(parents=True, exist_ok=True)
     pass1_output.mkdir(parents=True, exist_ok=True)
     pass2_output.mkdir(parents=True, exist_ok=True)
+    copy_config_dir(config_dir, pass1_config_dir)
+    copy_config_dir(config_dir, pass2_config_dir)
+    update_blkgrp_control_filename(pass2_config_dir / "settings.yaml", adjusted_control_file.name)
     workflow_log.write_text("")
 
     log(f"Two-pass workflow started for {run_dir}", workflow_log)
     log(f"Workflow dir: {workflow_dir}", workflow_log)
     log(f"Control file: {control_file}", workflow_log)
+    log(f"Adjusted control file: {adjusted_control_file}", workflow_log)
+    log(f"Pass 1 config dir: {pass1_config_dir}", workflow_log)
+    log(f"Pass 2 config dir: {pass2_config_dir}", workflow_log)
     log(f"Balancer method: {args.method}", workflow_log)
 
-    if backup_file.exists() and not args.skip_restore_original:
-        shutil.copy2(backup_file, control_file)
-        log(f"Restored original control file from backup: {backup_file}", workflow_log)
-    elif not backup_file.exists():
-        log("No pre-balancer backup found; pass 1 will use the current control file.", workflow_log)
+    log("Base control file is left unchanged; pass 2 uses a separate adjusted control file.", workflow_log)
 
     pass1_status = run_command(
-        ["populationsim", "-c", str(config_dir), "-d", str(data_dir), "-o", str(pass1_output)],
+        ["populationsim", "-c", str(pass1_config_dir), "-d", str(data_dir), "-o", str(pass1_output)],
         logs_dir / "pass1.log",
         logs_dir / "pass1.status",
         workflow_log,
@@ -233,7 +283,8 @@ def main() -> int:
         str(summary_file),
         "--method",
         args.method,
-        "--replace-original",
+        "--suffix",
+        adjusted_suffix,
         "--diagnostics-file",
         str(balancer_diagnostics),
     ]
@@ -251,17 +302,15 @@ def main() -> int:
         write_status(overall_status, "failed_balancer", balancer_status)
         return balancer_status
 
-    review_adjusted_control = validation_dir / control_file.name
-    shutil.copy2(control_file, review_adjusted_control)
+    if not adjusted_control_file.exists():
+        raise FileNotFoundError(f"Expected adjusted control file was not created: {adjusted_control_file}")
+
+    review_adjusted_control = validation_dir / adjusted_control_file.name
+    shutil.copy2(adjusted_control_file, review_adjusted_control)
     log(f"Saved adjusted control review copy: {review_adjusted_control}", workflow_log)
 
-    if backup_file.exists():
-        review_original_control = validation_dir / backup_file.name
-        shutil.copy2(backup_file, review_original_control)
-        log(f"Saved pre-balancer control review copy: {review_original_control}", workflow_log)
-
     pass2_status = run_command(
-        ["populationsim", "-c", str(config_dir), "-d", str(data_dir), "-o", str(pass2_output)],
+        ["populationsim", "-c", str(pass2_config_dir), "-d", str(data_dir), "-o", str(pass2_output)],
         logs_dir / "pass2.log",
         logs_dir / "pass2.status",
         workflow_log,

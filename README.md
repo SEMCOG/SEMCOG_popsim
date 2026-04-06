@@ -80,7 +80,6 @@ Useful options:
 ```bash
 python scripts/run_two_pass_hhsize.py --run-name 2024_synthesis --method legacy
 python scripts/run_two_pass_hhsize.py --run-dir /home/da/RDF2055/d_drive/popsim/runs/2024_synthesis
-python scripts/run_two_pass_hhsize.py --run-name 2024_synthesis --skip-restore-original
 ```
 
 Two-pass output structure:
@@ -96,6 +95,11 @@ output/
     │   ├── balancer.status
     │   ├── pass2.log
     │   └── pass2.status
+    ├── configs/
+    │   ├── pass1/
+    │   │   └── settings.yaml
+    │   └── pass2/
+    │       └── settings.yaml
     ├── pass1/
     ├── pass2/
     └── validation/
@@ -103,7 +107,9 @@ output/
 
 Notes:
 - `pass1/` is the first synthesis run
-- the household-size balancer updates the block-group control file between passes
+- `configs/pass1/settings.yaml` points to the base block-group control file
+- the household-size balancer writes an adjusted `_hhsize_adj` control file without overwriting or restoring the base control file
+- `configs/pass2/settings.yaml` points to the adjusted control file
 - `pass2/` is the final synthesis output
 - rerunning within the same hour reuses the same two-pass folder
 
@@ -138,3 +144,42 @@ python scripts/validate_popsim_run.py --output-dir /home/da/RDF2055/d_drive/pops
 ```
 
 Validation writes CSV summaries into a `validation/` folder under the target output folder.
+
+## 6. Generate Refinement Inputs
+Use the refinement input generator when you want to build a new synthesis package from existing UrbanSim outputs.
+
+This workflow creates the package inputs only. It does not run the refinement synthesis itself.
+
+```bash
+python scripts/generate_refinement_inputs.py refinement/configs/template_refinement.yaml
+```
+
+The YAML config controls:
+- project name
+- year
+- target geography
+- sample geography
+- input and target HDF paths
+- output root
+- optional county filter, weight column, and person-control toggle; omit county to keep all counties
+
+Each run writes one target geography package under:
+```text
+d_drive/popsim/runs/<project_name>_<target_geo_lower>/
+├── configs/
+│   ├── controls.csv
+│   ├── settings.yaml
+│   └── refinement_input_config.yaml
+├── data/
+│   ├── <project_name>_geo_cross_walk.csv
+│   ├── <project_name>_control_totals_<TARGET_GEO>.csv
+│   ├── <project_name>_seed_households.csv
+│   └── <project_name>_seed_persons.csv
+└── output/
+```
+
+Notes:
+- one target geography per run
+- example run folders are `2024_refine_taz` and `2024_refine_mcd`
+- review and edit `data/<project_name>_control_totals_<TARGET_GEO>.csv`, then replace that file in-place before the later refinement/synthesis run
+- `refinement/urbansim_refine_input.ipynb` remains reference material, but `scripts/generate_refinement_inputs.py` is the maintained entrypoint
