@@ -1,0 +1,10 @@
+# Local database credentials - never commit.
+# This repository is public. See configs/db_connection.yaml.example.
+configs/db_connection.yaml
+
+# Python build artifacts (a committed .pyc once leaked a credential in bytecode)
+__pycache__/
+*.pyc
+
+# Editor
+.vscode/

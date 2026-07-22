@@ -1,0 +1,11 @@
+# Local database credentials - TEMPLATE.
+#
+# Copy this file to configs/db_connection.yaml and fill in the real values:
+#
+#     cp configs/db_connection.yaml.example configs/db_connection.yaml
+#
+# configs/db_connection.yaml is gitignored and must never be committed - this
+# repository is public. Alternatively, set the POPSIM_DB_URL environment
+# variable, which takes precedence over this file.
+
+db_connection_str: postgresql://USER:PSWD@SERVER:PORT/DBNAME

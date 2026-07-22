@@ -1,5 +1,40 @@
+import os
+
 import pandas as pd
+import yaml
 from sqlalchemy.orm import close_all_sessions
+
+CREDENTIALS_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "configs",
+    "db_connection.yaml",
+)
+
+
+def get_db_connection_str():
+    """ Resolve the database connection string
+
+  Checked in order: the POPSIM_DB_URL environment variable, then the gitignored
+  configs/db_connection.yaml. The credential is deliberately kept out of
+  configs/sql.yaml, which is tracked in a public repository.
+
+  Returns:
+    Connection string
+  """
+    from_env = os.environ.get("POPSIM_DB_URL")
+    if from_env:
+        return from_env
+    if os.path.exists(CREDENTIALS_PATH):
+        with open(CREDENTIALS_PATH) as f:
+            conn = (yaml.safe_load(f) or {}).get("db_connection_str")
+        if conn:
+            return conn
+    raise RuntimeError(
+        "No database connection string found. Set POPSIM_DB_URL, or copy "
+        "configs/db_connection.yaml.example to configs/db_connection.yaml and "
+        "fill it in. Do not put the credential in configs/sql.yaml - that file "
+        "is tracked in a public repository."
+    )
 
 
 def list_tables(sql_config):
@@ -10,7 +45,7 @@ def list_tables(sql_config):
   Returns:
     Table names in Pandas Series
   """
-    table = pd.read_sql(sql_config["sql_list_tables"], sql_config["db_connection_str"])
+    table = pd.read_sql(sql_config["sql_list_tables"], get_db_connection_str())
     return table["tablename"]
 
 
@@ -30,7 +65,7 @@ def load_from_sql(sql_config, hdf):
         table_sql = sql_table_config["sql"]
         table_index_col = sql_table_config["index_col"]
         pd.read_sql(
-            table_sql, sql_config["db_connection_str"], index_col=table_index_col
+            table_sql, get_db_connection_str(), index_col=table_index_col
         ).to_hdf(hdf, table_name)
     close_all_sessions()
     return hdf

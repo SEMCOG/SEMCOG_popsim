@@ -1,7 +1,9 @@
 # Config file for PostgreSQL database
-
-# SQL connection info
-db_connection_str: postgresql://USER:PSWD@SERVER:PORT/DBNAME
+#
+# The connection string is deliberately NOT stored here - this file is tracked
+# in a public repository. Set the POPSIM_DB_URL environment variable, or copy
+# configs/db_connection.yaml.example to configs/db_connection.yaml (gitignored)
+# and fill it in. Resolved by forecast_input/input.py:get_db_connection_str.
 
 # SQL to get all tables
 sql_list_tables: >
