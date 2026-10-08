@@ -9,6 +9,92 @@ A simple guide for preparing and running SEMCOG PopulationSim.
 - `d_drive/popsim/runs/<run_name>/output/`: one-pass and two-pass synthesis outputs
 - `scripts/`: operational run helpers
 
+## Current Workflow: 2025 Base-Year Synthesis on the SEMCOG MCD Estimate
+The 2025 base-year households are controlled to SEMCOG's July 1, 2025 MCD household
+estimate. Household population is the RSQE 2025 total minus group quarters, per large
+area. Attribute patterns come from ACS 2020-2024. Run folder:
+`d_drive/popsim/runs/2025_synthesis_mcd/`.
+
+### Pipeline
+```text
+fetch_acs_b25002_bg.py        (one time)  ACS B25002 occupancy by block group
+        |
+adjust_to_mcd_2025.py         step "targets"    MCD estimate -> BG HHBASE / POPBASE
+        |                                       (data/targets/)
+build_controls_mcd_2025.py    step "controls"   ACS shares x targets -> BG / tract controls,
+        |                                       configs/, seed copies
+run_two_pass_hhsize.py        step "synthesis"  PopulationSim pass 1 -> hh_size_balancer.py
+        |                                       -> pass 2   (output/<stamp>_two_pass/)
+reconcile_bg_households.py    step "reconcile"  exact HHBASE in every BG
+                                                (output/<stamp>_two_pass/final/)
+```
+`scripts/run_2025_mcd_synthesis.py` runs the four steps in order.
+
+| Step | Script | Main inputs | Main outputs |
+|---|---|---|---|
+| targets | `input_prep/scripts/adjust_to_mcd_2025.py` | MCD estimate workbook, base-year HDF (buildings, parcels), city GQ table, RSQE workbook, ACS B25002 | `data/targets/bg_targets_2025.csv`, `bg_area_pieces_2025.csv`, `area_targets_2025.csv` |
+| controls | `input_prep/scripts/build_controls_mcd_2025.py` | targets, ACS 2020-2024 controls (`runs/2024_synthesis/data/`), PUMS seed | `data/SEMCOG_2025_control_totals_{blkgrp,tract}.csv`, `configs/`, `data/targets/controls_build_diagnostics.csv` |
+| synthesis | `scripts/run_two_pass_hhsize.py` | run folder | `output/<stamp>_two_pass/pass1/`, `pass2/`, logs |
+| reconcile | `scripts/reconcile_bg_households.py` | pass 2 output, size-adjusted BG controls | `output/<stamp>_two_pass/final/` (households, persons, log) |
+
+Method notes:
+- **targets:** Detroit is split into its 55 neighborhoods. Each area's vacant units are spread
+  over its BG x area building pieces by the ACS vacancy rate (shrunk toward tract and county),
+  so households never exceed residential units.
+- **controls:** each BG category share is shrunk toward its tract share,
+  `(count + K x tract share) / (BG base + K)`. K is estimated per control group from the data
+  (ACS sampling noise vs real BG variation) and printed in the log. Household size is refit
+  to POPBASE, not scaled.
+- **reconcile:** it changes only BGs that miss HHBASE. It writes a new `final/` folder and does
+  not change the PopulationSim output.
+
+### Environment (one time)
+OR-Tools, the fast integerizer, does not load in the base conda env, because pip `ortools`
+and conda-forge `pyarrow` bundle different abseil libraries. Use the isolated `popsim` env.
+The base env, which urbansim uses, stays unchanged.
+
+```bash
+conda create -y -n popsim python=3.12 pip
+PYTHONNOUSERSITE=1 /opt/conda/envs/popsim/bin/python -m pip install "populationsim==0.10.0" oyaml pyyaml openpyxl
+```
+
+Always set `PYTHONNOUSERSITE=1`, so packages in `~/.local` do not load into the env.
+
+### ACS input (one time)
+```bash
+CENSUS_API_KEY=<key> python input_prep/scripts/fetch_acs_b25002_bg.py
+```
+The key is read from the environment and is not written to disk.
+
+### Run
+```bash
+cd SEMCOG_popsim
+PYTHONNOUSERSITE=1 /opt/conda/envs/popsim/bin/python scripts/run_2025_mcd_synthesis.py \
+  --estimate ../d_drive/popsim/inputs/2025_semcog_estimate/July1_2025_Population_revised.xlsx \
+  --base-hdf ../d_drive/forecast_inputs/base_year/main_100226.h5
+```
+
+Useful options:
+- `--from-step controls` or `--to-step controls`: run part of the pipeline. Steps:
+  `targets`, `controls`, `synthesis`, `reconcile`.
+- A full run takes about 2 hours. In the background:
+  `PYTHONNOUSERSITE=1 nohup /opt/conda/envs/popsim/bin/python scripts/run_2025_mcd_synthesis.py ... > run.log 2>&1 &`
+
+The final synthetic population is in `output/<stamp>_two_pass/final/`. The exact inputs of
+each run are copied to `output/<stamp>_two_pass/inputs_snapshot/`.
+
+### Integerizer notes
+- Use `USE_CVXPY: false` (OR-Tools); `build_controls_mcd_2025.py` writes it. With
+  `USE_CVXPY: true`, PopulationSim uses GLPK through CVXPY, which is about 50-90 times slower
+  and has no working time limit (one solve cycled for 7 hours).
+- A few one-household tracts are always INFEASIBLE in the integerizer, and PopulationSim falls
+  back to smart rounding. This is expected and does not change the totals.
+
+### Superseded
+`input_prep/scripts/adjust_to_large_area_2025.py` (July 2026) scaled ACS controls by one
+household-population ratio per large area. It kept the ACS household size, so it produced
+about 57,000 fewer households than the MCD estimate. Do not use it for the 2025 base year.
+
 ## 1. Prepare a Run Package
 Create the PopulationSim run package from Census and PUMS inputs.
 
