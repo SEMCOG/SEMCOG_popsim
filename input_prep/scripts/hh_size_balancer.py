@@ -428,6 +428,9 @@ def build_adjusted_controls(
                 "adjusted_hhpersons7": float(rebalanced_counts[-1]),
                 "original_hhpersons6": float(original_counts[-2]),
                 "adjusted_hhpersons6": float(rebalanced_counts[-2]),
+                # feasibility flags: report, do not force
+                "top_bin_clipped": bool(pd.notna(synthesized_top_bin) and synthesized_top_bin != bounded_top_bin),
+                "person_gap": float(np.dot(rebalanced_counts, weights)) - target_population,
             }
         )
 
@@ -500,6 +503,11 @@ def main() -> None:
     print()
     print("diagnostic summary:")
     print(diagnostics_df[["original_implied_top_bin_size", "synthesized_top_bin_size", "bounded_top_bin_size"]].describe().to_string())
+    gap_limit = np.maximum(1.0, diagnostics_df["bounded_top_bin_size"] / 2)
+    print(f"block groups with the 7+ mean clipped to [{minimum_top_bin_size}, {maximum_top_bin_size}]: "
+          f"{int(diagnostics_df['top_bin_clipped'].sum())}")
+    print(f"block groups with a person gap above max(1, 7+ mean / 2): "
+          f"{int((diagnostics_df['person_gap'].abs() > gap_limit).sum())}")
 
 
 if __name__ == "__main__":
