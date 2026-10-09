@@ -9,6 +9,8 @@
 #     (BG base + K), with K = sigma2/tau2 estimated per control group from the
 #     data (ACS sampling noise vs real between-BG variation). A BG with no ACS
 #     data gets the tract share; a tract with too little data, the PUMA share.
+#   - Age of head: five bands; the 65+ band of B19037 is split into 65-74 and 75+
+#     with ACS B25007 (input from fetch_acs_b25002_bg.py).
 #   - Household size: NOT one ratio. The ACS size shares are tilted (shape-
 #     preserving balancer) until implied persons = POPBASE; 7+ households count
 #     at the PUMS mean size of 7+ households in the PUMA. BGs whose target mean
@@ -39,6 +41,7 @@ RUNS = REPO_ROOT.parent / "d_drive" / "popsim" / "runs"
 RUN_DIR = RUNS / "2025_synthesis_mcd"
 TARGETS = RUN_DIR / "data" / "targets" / "bg_targets_2025.csv"
 ACS_DIR = RUNS / "2024_synthesis" / "data"          # unadjusted ACS 2020-2024 controls
+ACS_B25007 = REPO_ROOT.parent / "d_drive" / "popsim" / "inputs" / "acs_2024_bg" / "acs2024_5yr_B25007_bg.csv"
 TEMPLATE = RUNS / "2025_synthesis"                  # seed, crosswalk, configs
 
 BLKGRP_OUT = RUN_DIR / "data" / "SEMCOG_2025_control_totals_blkgrp.csv"
@@ -49,7 +52,7 @@ COPY_DATA = ["SEMCOG_2024_seed_households.csv", "SEMCOG_2024_seed_persons.csv",
 
 # ---------------------------------------------------------------- controls
 HH_GROUPS = {
-    "HHAGE": ["HHAGE1", "HHAGE2", "HHAGE3", "HHAGE4"],
+    "HHAGE": ["HHAGE1", "HHAGE2", "HHAGE3", "HHAGE4", "HHAGE5"],  # 4 = 65-74, 5 = 75+
     "HHRACE": ["HHRACE1", "HHRACE2", "HHRACE3", "HHRACE4"],
     "HHHISP": ["HHHISP1", "HHHISP2"],
     "HHCHD": ["HHCHD1", "HHCHD2"],
@@ -147,6 +150,44 @@ def workers_2plus_mean_by_puma():
     return m.reindex(hh.PUMA.unique()).fillna(np.average(w2.HWORKERS, weights=w2.WGTP))
 
 
+def split_head_age_65(acs, xw):
+    """Split ACS age-of-head band HHAGE4 (65+, B19037) into HHAGE4 = 65-74 and
+    HHAGE5 = 75+ with the B25007 householder ratio of the block group (the tract,
+    then the PUMA, where the BG has no householders aged 65+).
+
+    Without this split the 65-74 vs 75+ mix came from the PUMS seed and was biased
+    toward 75+ in every large area (75+/65+ 0.43-0.50 vs ACS 0.39-0.43), which
+    inflated the household forecast, because heads aged 75+ grow fastest."""
+    b = pd.read_csv(ACS_B25007, dtype={"BLKGRPID": str}).set_index("BLKGRPID")
+    b = b.join(xw.set_index("BLKGRPID")[["TRACT", "PUMA"]])
+    young, old = b.acs_hoh_65_74, b.acs_hoh_75_plus
+    ratio = young / (young + old)
+    for level in ("TRACT", "PUMA"):
+        y, o = young.groupby(b[level]).transform("sum"), old.groupby(b[level]).transform("sum")
+        ratio = ratio.fillna(y / (y + o))
+    ratio = ratio.fillna(young.sum() / (young.sum() + old.sum()))
+    out = acs.copy()
+    r = out.BLKGRPID.map(ratio).fillna(young.sum() / (young.sum() + old.sum()))
+    total65 = out["HHAGE4"]
+    out["HHAGE4"] = total65 * r
+    out.insert(out.columns.get_loc("HHAGE4") + 1, "HHAGE5", total65 * (1 - r))
+    print("head age 65+ split from B25007: region 75+/65+ = %.3f" % (out.HHAGE5.sum() / total65.sum()))
+    return out
+
+
+def split_head_age_control_rows(ctl):
+    """Replace the control hh_age_65_plus by hh_age_65_74 (HHAGE4) and hh_age_75_plus (HHAGE5)."""
+    i = ctl.index[ctl.target == "hh_age_65_plus"]
+    assert len(i) == 1, "template controls changed: hh_age_65_plus not found"
+    row = ctl.loc[i[0]]
+    rows = [row.copy(), row.copy()]
+    rows[0][["target", "control_field", "expression"]] = [
+        "hh_age_65_74", "HHAGE4", "(households.AGEHOH > 64) & (households.AGEHOH <= 74)"]
+    rows[1][["target", "control_field", "expression"]] = [
+        "hh_age_75_plus", "HHAGE5", "(households.AGEHOH > 74)"]
+    return pd.concat([ctl.loc[:i[0] - 1], pd.DataFrame(rows), ctl.loc[i[0] + 1:]], ignore_index=True)
+
+
 def top_bin_mean_by_puma():
     """Weighted PUMS mean size of 7+ person households, by PUMA."""
     hh = pd.read_csv(TEMPLATE / "data" / COPY_DATA[0], usecols=["PUMA", "NP", "WGTP"])
@@ -164,6 +205,7 @@ def main():
     xw = xw.rename(columns={"TRACTID": "TRACT"})
     xw["PUMA"] = xw.PUMA.astype(int)
 
+    acs = split_head_age_65(acs, xw)
     acs = acs.set_index("BLKGRPID").reindex(tgt.BLKGRPID).fillna(0).reset_index()
     out = tgt.set_index("BLKGRPID")
     hh, pop = out.HHBASE.to_numpy(), out.POPBASE.to_numpy()
@@ -270,7 +312,7 @@ def main():
     assert "USE_CVXPY: true\n" in settings, "template settings changed: check USE_CVXPY"
     settings = settings.replace("USE_CVXPY: true\n", "USE_CVXPY: false  # OR-Tools; run in the popsim conda env\n")
     (RUN_DIR / "configs" / "settings.yaml").write_text(settings)
-    ctl = pd.read_csv(TEMPLATE / "configs" / "controls.csv")
+    ctl = split_head_age_control_rows(pd.read_csv(TEMPLATE / "configs" / "controls.csv"))
     unknown = set(IMPORTANCE) - set(ctl.target)
     assert not unknown, unknown
     ctl["importance"] = ctl.target.map(IMPORTANCE).fillna(ctl.importance).astype(int)

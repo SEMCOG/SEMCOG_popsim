@@ -26,7 +26,8 @@ MIN_DONORS = 20
 
 # household -> control category, as in configs/controls.csv
 CATEGORIES = {
-    "HHAGE": lambda h: np.select([h.AGEHOH <= 24, h.AGEHOH <= 44, h.AGEHOH <= 64], ["HHAGE1", "HHAGE2", "HHAGE3"], "HHAGE4"),
+    "HHAGE": lambda h: np.select([h.AGEHOH <= 24, h.AGEHOH <= 44, h.AGEHOH <= 64, h.AGEHOH <= 74],
+                                 ["HHAGE1", "HHAGE2", "HHAGE3", "HHAGE4"], "HHAGE5"),   # 4 = 65-74, 5 = 75+
     "HHRACE": lambda h: "HHRACE" + h.HRACE.astype(int).astype(str),
     "HHHISP": lambda h: np.where(h.HHISP == 1, "HHHISP2", "HHHISP1"),
     "HHCHD": lambda h: np.where(h.R18 == 1, "HHCHD1", "HHCHD2"),
