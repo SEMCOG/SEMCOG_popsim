@@ -226,7 +226,8 @@ def preprocess_pums(h_pums, p_pums):
     }
     industry = p_pums["NAICSP"].astype("string").str[:2].map(dict_naics2ind)
     industry = industry.fillna(0)
-    industry.loc[p_pums["NAICSP"].astype("string").str[:6] == "928110"] = 14
+    # armed forces: PUMS NAICSP is 92811P1-92811P7, not 928110
+    industry.loc[p_pums["NAICSP"].astype("string").str[:5] == "92811"] = 14
     p_pums["industry"] = industry.astype(int)
  
     # adjust person income to current ACS year (release year)

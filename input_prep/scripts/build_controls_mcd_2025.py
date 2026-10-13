@@ -20,6 +20,14 @@
 #     EMPWORKER = ACS tract rate per person x new tract HH population. Tracts on
 #     PUMA rates derive EMPWORKER from the worker groups and industry from
 #     EMPWORKER, so the three cannot contradict.
+#   - Industry controls count employed persons only (ESR 1-2; armed forces ESR 4-5),
+#     as the ACS tables do; the seed copy codes the armed forces as industry 14.
+#   - Worker controls count workers at work (ESR 1, 4), as B08014 / B08202 do; the
+#     seed copy adds HWORKERS_AT_WORK for the household worker groups.
+#   - Optional PUMA controls (USE_PUMA_PROFILE): person age inside the BG bands 25-64 and 65+, and
+#     workers by age, at the PUMS seed shares of the PUMA, scaled to the BG / tract
+#     totals of the PUMA. Without them the balancing moved workers to ages 20-34 and
+#     persons from 65-69 to 70-74 (review 2026-10-13).
 #   - Importance: totals hard; size high; workers lowered; income raised.
 #
 # Usage:
@@ -42,10 +50,11 @@ RUN_DIR = RUNS / "2025_synthesis_mcd"
 TARGETS = RUN_DIR / "data" / "targets" / "bg_targets_2025.csv"
 ACS_DIR = RUNS / "2024_synthesis" / "data"          # unadjusted ACS 2020-2024 controls
 ACS_B25007 = REPO_ROOT.parent / "d_drive" / "popsim" / "inputs" / "acs_2024_bg" / "acs2024_5yr_B25007_bg.csv"
-TEMPLATE = RUNS / "2025_synthesis"                  # seed, crosswalk, configs
+TEMPLATE = RUNS / "2025_synthesis_07_08"            # July run: seed, crosswalk, configs
 
 BLKGRP_OUT = RUN_DIR / "data" / "SEMCOG_2025_control_totals_blkgrp.csv"
 TRACT_OUT = RUN_DIR / "data" / "SEMCOG_2025_control_totals_tract.csv"
+PUMA_OUT = RUN_DIR / "data" / "SEMCOG_2025_control_totals_puma.csv"
 DIAG_OUT = RUN_DIR / "data" / "targets" / "controls_build_diagnostics.csv"
 COPY_DATA = ["SEMCOG_2024_seed_households.csv", "SEMCOG_2024_seed_persons.csv",
              "SEMCOG_2024_geo_cross_walk.csv"]
@@ -68,6 +77,14 @@ POP_GROUPS = {
 }
 WORKER_COLS = ["HHWORKER0", "HHWORKER1", "HHWORKER2"]
 INDUSTRY_COLS = ["INDUSTRY%d" % i for i in range(1, 15)]
+# PUMA controls: BG age band -> {column: (min age, max age)}; workers by age
+PUMA_AGE = {
+    "AGEP3": {"PAGE25_34": (25, 34), "PAGE35_54": (35, 54), "PAGE55_64": (55, 64)},
+    "AGEP4": {"PAGE65_69": (65, 69), "PAGE70_74": (70, 74), "PAGE75P": (75, 200)},
+}
+PUMA_WORKER = {"PWORK16_24": (16, 24), "PWORK25_54": (25, 54), "PWORK55_64": (55, 64), "PWORK65P": (65, 200)}
+PUMA_IMPORTANCE = 1000   # moderate: below the age-of-head, income and size controls
+USE_PUMA_PROFILE = False  # off in run 5: test the industry fix alone first
 
 MIN_HH = 20      # tract with fewer ACS households than this: PUMA shares as the prior
 MIN_POP = 50     # same, for person groups
@@ -188,6 +205,108 @@ def split_head_age_control_rows(ctl):
     return pd.concat([ctl.loc[:i[0] - 1], pd.DataFrame(rows), ctl.loc[i[0] + 1:]], ignore_index=True)
 
 
+def puma_profile_controls(out, tout, xw):
+    """PUMA controls for person age inside the BG bands AGEP3 (25-64) and AGEP4 (65+),
+    and for workers by age. Shares are the PUMS seed shares of the PUMA (household
+    persons, PWGTP); totals are the BG / tract control sums of the PUMA, so the new
+    controls agree with the existing ones."""
+    p = pd.read_csv(TEMPLATE / "data" / COPY_DATA[1], usecols=["PUMA", "AGEP", "ESR", "PWGTP"])
+    worker = p.ESR.isin([1, 2, 4, 5])
+    bg_puma = xw.set_index("BLKGRPID").PUMA.loc[out.index]
+    tr_puma = xw.drop_duplicates("TRACT").set_index("TRACT").PUMA.loc[tout.index]
+    res = pd.DataFrame(index=pd.Index(sorted(bg_puma.unique()), name="PUMA"))
+
+    def fill(masks, total):
+        seed = pd.DataFrame({c: p.PWGTP.where(m, 0).groupby(p.PUMA).sum() for c, m in masks.items()})
+        seed = seed.reindex(res.index).fillna(0)
+        res[list(masks)] = allocate_group(seed.div(seed.sum(axis=1), axis=0).to_numpy(),
+                                          total.reindex(res.index).to_numpy())
+
+    for broad, bands in PUMA_AGE.items():
+        fill({c: p.AGEP.between(lo, hi) for c, (lo, hi) in bands.items()}, out[broad].groupby(bg_puma).sum())
+    fill({c: worker & p.AGEP.between(lo, hi) for c, (lo, hi) in PUMA_WORKER.items()},
+         tout.EMPWORKER.groupby(tr_puma).sum())
+
+    for broad, bands in PUMA_AGE.items():
+        assert (res[list(bands)].sum(axis=1) == out[broad].groupby(bg_puma).sum()).all()
+    assert (res[list(PUMA_WORKER)].sum(axis=1) == tout.EMPWORKER.groupby(tr_puma).sum()).all()
+    assert (res.PWORK25_54 <= res.PAGE25_34 + res.PAGE35_54).all()
+    assert (res.PWORK55_64 <= res.PAGE55_64).all()
+    assert (res.PWORK65P <= res.PAGE65_69 + res.PAGE70_74 + res.PAGE75P).all()
+    return res
+
+
+def puma_control_rows():
+    """controls.csv rows for the PUMA profile controls."""
+    rows = []
+    bands = {c: r for b in PUMA_AGE.values() for c, r in b.items()}
+    for c, (lo, hi) in {**bands, **PUMA_WORKER}.items():
+        age = "(persons.AGEP >= %d)" % lo + ("" if hi >= 200 else " & (persons.AGEP <= %d)" % hi)
+        work = c.startswith("PWORK")
+        rows.append({
+            "target": ("persons_worker_" + c[5:] if work else "persons_age_" + c[4:]).lower(),
+            "geography": "PUMA", "seed_table": "persons", "importance": PUMA_IMPORTANCE,
+            "control_field": c,
+            "expression": age + (" & persons.ESR.isin([1,2,4,5])" if work else "")})
+    return pd.DataFrame(rows)
+
+
+def fix_industry_rows(ctl):
+    """Count only employed persons in the industry controls, as the ACS tables do.
+
+    PUMS gives an industry code to everyone who worked in the last 5 years, so the
+    template expression (persons.industry == k) also counted ~581,000 persons who are
+    not employed. To meet the employed-only controls, the balancing removed 81% of
+    them (recent retirees, teens between jobs) and moved the age profile.
+    Industries 1-13 (C24030): civilian employed, ESR 1-2. Industry 14 (B08126,
+    armed forces): ESR 4-5."""
+    ind = ctl.target.str.match(r"Persons_industry_\d+$")
+    assert ind.sum() == 14, "template controls changed: industry rows"
+    ctl = ctl.copy()
+    ctl.loc[ind, "expression"] = ctl.loc[ind, "expression"].str.strip() + " & persons.ESR.isin([1,2])"
+    ctl.loc[ctl.target == "Persons_industry_14", "expression"] = "persons.ESR.isin([4,5])"
+    return ctl
+
+
+def fix_worker_rows(ctl):
+    """Count workers AT WORK in the reference week (ESR 1, 4), as the ACS sources of
+    EMPWORKER (B08014) and HHWORKER (B08202) do. The template counted all employed
+    persons (ESR 1, 2, 4, 5); the controls were ~2% lower, so the balancing removed
+    ~50,000 employed persons and every worker rate came out ~1 point low."""
+    ctl = ctl.copy()
+    w = ctl.target == "persons_worker"
+    hw = ctl.target.str.match(r"hh_workers_\d$")
+    assert w.sum() == 1 and hw.sum() == 3, "template controls changed: worker rows"
+    ctl.loc[w, "expression"] = "persons.ESR.isin([1,4])"
+    ctl.loc[hw, "expression"] = ctl.loc[hw, "expression"].str.replace(
+        "households.HWORKERS ", "households.HWORKERS_AT_WORK ", regex=False)
+    assert ctl.loc[hw, "expression"].str.contains("HWORKERS_AT_WORK").all()
+    return ctl
+
+
+def write_seed_households(dst):
+    """Copy the seed households with HWORKERS_AT_WORK = persons with ESR 1 or 4 (used
+    by the hh_workers controls). HWORKERS (all employed) is kept for the output."""
+    h = pd.read_csv(TEMPLATE / "data" / COPY_DATA[0], low_memory=False)
+    p = pd.read_csv(TEMPLATE / "data" / COPY_DATA[1], usecols=["hh_id", "ESR"])
+    n = p[p.ESR.isin([1, 4])].groupby("hh_id").size()
+    h["HWORKERS_AT_WORK"] = h.hh_id.map(n).fillna(0).astype(int)
+    assert (h.HWORKERS_AT_WORK <= h.HWORKERS).all()
+    h.to_csv(dst, index=False)
+    print("seed households: HWORKERS_AT_WORK added (differs from HWORKERS in %d records)"
+          % (h.HWORKERS_AT_WORK != h.HWORKERS).sum())
+
+
+def write_seed_persons(dst):
+    """Copy the seed persons with industry = 14 for the armed forces (ESR 4-5); the
+    seed codes them 13, because its NAICSP test missed the 92811P* codes."""
+    p = pd.read_csv(TEMPLATE / "data" / COPY_DATA[1], low_memory=False)
+    af = p.ESR.isin([4, 5])
+    p.loc[af, "industry"] = 14
+    p.to_csv(dst, index=False)
+    print("seed persons: industry -> 14 for %d armed-forces records" % af.sum())
+
+
 def top_bin_mean_by_puma():
     """Weighted PUMS mean size of 7+ person households, by PUMA."""
     hh = pd.read_csv(TEMPLATE / "data" / COPY_DATA[0], usecols=["PUMA", "NP", "WGTP"])
@@ -294,6 +413,7 @@ def main():
     puma_tr = tr.index[use_puma_hh | use_puma_pop]
     assert (tout.loc[puma_tr, INDUSTRY_COLS].sum(axis=1) == tout.loc[puma_tr, "EMPWORKER"]).all()
     assert (out.select_dtypes("number") >= 0).all().all() and (tout >= 0).all().all()
+    pout = puma_profile_controls(out, tout, xw) if USE_PUMA_PROFILE else None
 
     # ---- write the run package
     (RUN_DIR / "configs").mkdir(parents=True, exist_ok=True)
@@ -302,20 +422,37 @@ def main():
     out.reset_index()[col_order].to_csv(BLKGRP_OUT, index=False)
     tcols = [c for c in acs_tr.columns if c != "TRACTID"]
     tout[tcols].rename_axis("TRACTID").reset_index()[tcols + ["TRACTID"]].to_csv(TRACT_OUT, index=False)
+    if USE_PUMA_PROFILE:
+        pout.reset_index().to_csv(PUMA_OUT, index=False)
+    else:
+        PUMA_OUT.unlink(missing_ok=True)
     diag.to_csv(DIAG_OUT)
     for f in COPY_DATA:
-        shutil.copy2(TEMPLATE / "data" / f, RUN_DIR / "data" / f)
+        if f == COPY_DATA[0]:
+            write_seed_households(RUN_DIR / "data" / f)
+        elif f == COPY_DATA[1]:
+            write_seed_persons(RUN_DIR / "data" / f)
+        else:
+            shutil.copy2(TEMPLATE / "data" / f, RUN_DIR / "data" / f)
     # OR-Tools integerizer: ~50-90x faster than CVXPY/GLPK with the same quality, and
     # GLPK has no working time limit. Needs the isolated popsim conda env (in the
     # base env, ortools + conda pyarrow segfault).
     settings = (TEMPLATE / "configs" / "settings.yaml").read_text()
     assert "USE_CVXPY: true\n" in settings, "template settings changed: check USE_CVXPY"
     settings = settings.replace("USE_CVXPY: true\n", "USE_CVXPY: false  # OR-Tools; run in the popsim conda env\n")
+    if USE_PUMA_PROFILE:
+        tract_entry = "  tablename: TRACT_control_data\n"
+        assert settings.count(tract_entry) == 1, "template settings changed: check TRACT_control_data"
+        settings = settings.replace(tract_entry, tract_entry + "- filename: %s\n  tablename: PUMA_control_data\n"
+                                    % PUMA_OUT.name)
     (RUN_DIR / "configs" / "settings.yaml").write_text(settings)
     ctl = split_head_age_control_rows(pd.read_csv(TEMPLATE / "configs" / "controls.csv"))
+    ctl = fix_worker_rows(fix_industry_rows(ctl))
     unknown = set(IMPORTANCE) - set(ctl.target)
     assert not unknown, unknown
     ctl["importance"] = ctl.target.map(IMPORTANCE).fillna(ctl.importance).astype(int)
+    if USE_PUMA_PROFILE:
+        ctl = pd.concat([ctl, puma_control_rows()], ignore_index=True)
     ctl.to_csv(RUN_DIR / "configs" / "controls.csv", index=False)
 
     # ---- report
@@ -331,6 +468,8 @@ def main():
     reg = out[SIZE_COLS].sum() / out.HHBASE.sum()
     acs_reg = acs[SIZE_COLS].sum() / acs.HHBASE.sum()
     print("region size shares ACS -> new:\n%s" % pd.DataFrame({"acs": acs_reg, "new": reg}).round(4).T.to_string())
+    if USE_PUMA_PROFILE:
+        print("PUMA profile controls, region:\n%s" % pout.sum().to_string())
     print("wrote", RUN_DIR)
 
 
