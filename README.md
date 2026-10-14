@@ -8,103 +8,135 @@ A simple guide for preparing and running SEMCOG PopulationSim.
 - `d_drive/popsim/runs/<run_name>/data/`: generated synthesis inputs
 - `d_drive/popsim/runs/<run_name>/output/`: one-pass and two-pass synthesis outputs
 - `scripts/`: operational run helpers
+- `d_drive/popsim/inputs/`: hand-placed inputs (PUMS, MCD estimate, Census key file) and fetched ACS tables
 
-## Current Workflow: 2025 Base-Year Synthesis on the SEMCOG MCD Estimate
-The 2025 base-year households are controlled to SEMCOG's July 1, 2025 MCD household
-estimate. Household population is the RSQE 2025 total minus group quarters, per large
-area. Attribute patterns come from ACS 2020-2024. Run folder:
-`d_drive/popsim/runs/2025_synthesis_mcd/`.
+## Base-Year Synthesis on the SEMCOG MCD Estimate
+Households are controlled to SEMCOG's MCD household estimate. Household population is the
+RSQE total population minus group quarters, per large area. Attribute patterns come from the
+ACS 5-year tables, and the households are copied from the ACS PUMS (the seed).
 
-### Pipeline
-```text
-fetch_acs_b25002_bg.py        (one time)  ACS B25002 occupancy by block group
-        |
-adjust_to_mcd_2025.py         step "targets"    MCD estimate -> BG HHBASE / POPBASE
-        |                                       (data/targets/)
-build_controls_mcd_2025.py    step "controls"   ACS shares x targets -> BG / tract controls,
-        |                                       configs/, seed copies
-run_two_pass_hhsize.py        step "synthesis"  PopulationSim pass 1 -> hh_size_balancer.py
-        |                                       -> pass 2   (output/<stamp>_two_pass/)
-reconcile_bg_households.py    step "reconcile"  exact HHBASE in every BG
-                                                (output/<stamp>_two_pass/final/)
+Run folder: `d_drive/popsim/runs/<run_name>/` (set as `RUN_DIR` at the top of the step scripts).
+`d_drive/` is a sibling of this repository.
+
+### Inputs
+| Input | Where | Read by |
+|---|---|---|
+| ACS PUMS household and person files (Michigan) | `d_drive/popsim/inputs/pums/<year>/` | step 0 |
+| Census API key (one line) | a file in `d_drive/popsim/inputs/` (never in the repository) | step 0, ACS fetch |
+| SEMCOG MCD household estimate workbook | `d_drive/popsim/inputs/<estimate folder>/` | targets (`--estimate`) |
+| Base-year HDF with buildings and parcels | `d_drive/forecast_inputs/base_year/` | targets (`--base-hdf`) |
+| City table of population, group quarters, households (Detroit by neighborhood) | `d_drive/forecast_inputs/group_quarters/data/` | targets (`CITY_TABLE` in `adjust_to_mcd_2025.py`) |
+| RSQE forecast workbook | `d_drive/forecast_inputs/forecast_controls/data/` | targets (`RSQE_WORKBOOK` in `adjust_to_mcd_2025.py`) |
+
+### Steps
+**Step 0. ACS run package (once per ACS vintage).** Builds the raw ACS block-group and tract
+controls, the PUMS seed, the crosswalk and template configs in `d_drive/popsim/runs/<acs_run>/`:
+```bash
+python input_prep/scripts/popsim_input_maker.py "$(cat <key file>)" input_prep/configs/<acs_run>/prepare.yaml
 ```
-`scripts/run_2025_mcd_synthesis.py` runs the four steps in order.
+The step scripts read this package through `ACS_DIR` / `ACS_CONTROLS` and `TEMPLATE` (set at the top of
+`adjust_to_mcd_2025.py` and `build_controls_mcd_2025.py`). Keep the template folder.
 
-| Step | Script | Main inputs | Main outputs |
+**ACS fetch (once per ACS vintage).** Block-group occupancy (B25002) and age of householder (B25007):
+```bash
+CENSUS_API_KEY="$(cat <key file>)" python input_prep/scripts/fetch_acs_b25002_bg.py
+```
+The output goes to `d_drive/popsim/inputs/<acs folder>/`. The key is read from the environment only.
+
+**Steps 1-4.** `scripts/run_2025_mcd_synthesis.py` runs them in order:
+
+| Step | Script | What it does | Output |
 |---|---|---|---|
-| targets | `input_prep/scripts/adjust_to_mcd_2025.py` | MCD estimate workbook, base-year HDF (buildings, parcels), city GQ table, RSQE workbook, ACS B25002 | `data/targets/bg_targets_2025.csv`, `bg_area_pieces_2025.csv`, `area_targets_2025.csv` |
-| controls | `input_prep/scripts/build_controls_mcd_2025.py` | targets, ACS 2020-2024 controls (`runs/2024_synthesis/data/`), PUMS seed | `data/SEMCOG_2025_control_totals_{blkgrp,tract}.csv`, `configs/`, `data/targets/controls_build_diagnostics.csv` |
-| synthesis | `scripts/run_two_pass_hhsize.py` | run folder | `output/<stamp>_two_pass/pass1/`, `pass2/`, logs |
-| reconcile | `scripts/reconcile_bg_households.py` | pass 2 output, size-adjusted BG controls | `output/<stamp>_two_pass/final/` (households, persons, log) |
+| targets | `input_prep/scripts/adjust_to_mcd_2025.py` | Turns the MCD estimate into household and household-population targets per block group. Detroit is split into neighborhoods. Vacant units are spread over block group × area pieces by ACS vacancy rate, so households never exceed residential units. | `data/targets/` |
+| controls | `input_prep/scripts/build_controls_mcd_2025.py` | ACS shares × targets → block-group and tract controls. Block-group shares are shrunk toward the tract share to reduce ACS noise; household size is refit to the population target. Writes the run's seed copy and configs. | `data/`, `configs/` |
+| synthesis | `scripts/run_two_pass_hhsize.py` | PopulationSim pass 1, household-size balancer, pass 2 | `output/<stamp>_two_pass/pass1/`, `pass2/` |
+| reconcile | `scripts/reconcile_bg_households.py` | Makes the household count exact in every block group | `output/<stamp>_two_pass/final/` |
 
-Method notes:
-- **targets:** Detroit is split into its 55 neighborhoods. Each area's vacant units are spread
-  over its BG x area building pieces by the ACS vacancy rate (shrunk toward tract and county),
-  so households never exceed residential units.
-- **controls:** each BG category share is shrunk toward its tract share,
-  `(count + K x tract share) / (BG base + K)`. K is estimated per control group from the data
-  (ACS sampling noise vs real BG variation) and printed in the log. Household size is refit
-  to POPBASE, not scaled.
-- **reconcile:** it changes only BGs that miss HHBASE. It writes a new `final/` folder and does
-  not change the PopulationSim output.
+Notes on the controls step:
+- Each seed expression must count the same persons as its ACS table. Industry counts employed
+  persons; workers count persons at work. The builder sets these expressions and adds the seed
+  columns they need to the run's seed copy (the template seed is not changed).
+- Tracts with large group quarters (for example, campus dorms) get worker and industry controls
+  built from household worker counts, because ACS person tables include group-quarters residents.
 
 ### Environment (one time)
-OR-Tools, the fast integerizer, does not load in the base conda env, because pip `ortools`
-and conda-forge `pyarrow` bundle different abseil libraries. Use the isolated `popsim` env.
-The base env, which urbansim uses, stays unchanged.
-
+OR-Tools, the fast integerizer, does not load in the base conda env (pip `ortools` and conda-forge
+`pyarrow` bundle different abseil libraries). Use the isolated `popsim` env; the base env, which
+urbansim uses, stays unchanged.
 ```bash
 conda create -y -n popsim python=3.12 pip
 PYTHONNOUSERSITE=1 /opt/conda/envs/popsim/bin/python -m pip install "populationsim==0.10.0" oyaml pyyaml openpyxl
 ```
-
 Always set `PYTHONNOUSERSITE=1`, so packages in `~/.local` do not load into the env.
-
-### ACS input (one time)
-```bash
-CENSUS_API_KEY=<key> python input_prep/scripts/fetch_acs_b25002_bg.py
-```
-The key is read from the environment and is not written to disk.
 
 ### Run
 ```bash
 cd SEMCOG_popsim
 PYTHONNOUSERSITE=1 /opt/conda/envs/popsim/bin/python scripts/run_2025_mcd_synthesis.py \
-  --estimate ../d_drive/popsim/inputs/2025_semcog_estimate/July1_2025_Population_revised.xlsx \
-  --base-hdf ../d_drive/forecast_inputs/base_year/main_100226.h5
+  --estimate <estimate workbook> --base-hdf <base-year HDF>
 ```
-
-Useful options:
-- `--from-step controls` or `--to-step controls`: run part of the pipeline. Steps:
-  `targets`, `controls`, `synthesis`, `reconcile`.
+- `--from-step` / `--to-step` run part of the pipeline (`targets`, `controls`, `synthesis`,
+  `reconcile`). A control change needs only `--from-step controls` (no `--estimate`, `--base-hdf`).
 - A full run takes about 2 hours. In the background:
-  `PYTHONNOUSERSITE=1 nohup /opt/conda/envs/popsim/bin/python scripts/run_2025_mcd_synthesis.py ... > run.log 2>&1 &`
+  `PYTHONNOUSERSITE=1 nohup /opt/conda/envs/popsim/bin/python scripts/run_2025_mcd_synthesis.py ... > <log> 2>&1 &`
+- To stop a run, kill its PIDs. Do not use `pkill -f`, which can kill the calling shell.
+- `<stamp>` in the output folder is the start date and hour in UTC; log timestamps are UTC too.
 
-The final synthetic population is in `output/<stamp>_two_pass/final/`. The exact inputs of
-each run are copied to `output/<stamp>_two_pass/inputs_snapshot/`.
+### Run-folder structure
+```text
+d_drive/popsim/runs/<run_name>/
+├── configs/                  controls.csv, settings.yaml
+├── data/
+│   ├── targets/              block-group targets, block group × area pieces (input to placement),
+│   │                         area targets, build diagnostics
+│   ├── *_control_totals_*.csv   block-group and tract controls; size-adjusted block-group controls
+│   └── *_seed_*.csv, *_geo_cross_walk.csv   the run's seed copy and crosswalk
+└── output/<stamp>_two_pass/
+    ├── configs/pass1/, pass2/   settings and controls of each pass
+    ├── logs/                 pass1, balancer, pass2 logs and status files
+    ├── pass1/, pass2/        PopulationSim outputs and summaries
+    ├── final/                synthetic households and persons  <- the deliverable
+    ├── inputs_snapshot/      control files and configs used by this run
+    └── validation/           size-balancer review copy, charts/
+```
+Use `final/`, not `pass2/`.
 
-### Integerizer notes
-- Use `USE_CVXPY: false` (OR-Tools); `build_controls_mcd_2025.py` writes it. With
-  `USE_CVXPY: true`, PopulationSim uses GLPK through CVXPY, which is about 50-90 times slower
-  and has no working time limit (one solve cycled for 7 hours).
-- A few one-household tracts are always INFEASIBLE in the integerizer, and PopulationSim falls
-  back to smart rounding. This is expected and does not change the totals.
+### Charts
+```bash
+python scripts/plot_synthesis_results.py \
+  --summary-dir <run>/output/<stamp>_two_pass/pass2 \
+  --out-dir     <run>/output/<stamp>_two_pass/validation/charts \
+  --final-dir   <run>/output/<stamp>_two_pass/final --seed-dir <run>/data \
+  [--compare-dir <older run>/pass2 --compare-label "<label>"] \
+  [--acs-blkgrp <acs_run>/data/<ACS block-group controls>]
+```
+Use `--final-dir`, so results are counted from the output population. PopulationSim's tract summary
+reports the tract-level weights, which differ a little from the output.
 
-### Superseded
-`input_prep/scripts/adjust_to_large_area_2025.py` (July 2026) scaled ACS controls by one
-household-population ratio per large area. It kept the ACS household size, so it produced
-about 57,000 fewer households than the MCD estimate. Do not use it for the 2025 base year.
+### Integerizer
+- Use `USE_CVXPY: false` (OR-Tools); the controls step writes it. With `true`, PopulationSim uses
+  GLPK, which is much slower and has no working time limit.
+- A few very small zones are INFEASIBLE in the integerizer, and PopulationSim falls back to smart
+  rounding. This is expected; the totals stay exact.
+
+### After the synthesis
+1. Place the households into buildings (`final/` and the block group × area pieces in `data/targets/`).
+2. Build the base-year HDF.
+3. Re-run the household controls with the new HDF (`forecast_data_input`).
+4. Realign the employed worker rates to the new base.
+
+`input_prep/scripts/adjust_to_large_area_2025.py` is superseded: it scaled ACS controls by one ratio
+per large area and kept the ACS household size. Do not use it for the base year.
+
+## Other Workflows
+The sections below describe the general run package (used as step 0 above), plain one-pass and
+two-pass runs, and the refinement inputs.
 
 ## 1. Prepare a Run Package
 Create the PopulationSim run package from Census and PUMS inputs.
 
 ```bash
 python input_prep/scripts/popsim_input_maker.py <census_key> input_prep/configs/<run_name>/prepare.yaml
-```
-
-Example:
-```bash
-python input_prep/scripts/popsim_input_maker.py <census_key> input_prep/configs/2024_synthesis/prepare.yaml
 ```
 
 This produces a run package under:
@@ -120,17 +152,17 @@ d_drive/popsim/runs/<run_name>/
 ## 2. Run One-Pass Synthesis
 Run the standard one-pass synthesis.
 
-Using the helper script:
+Using the helper script (set `RUN_DIR` for another run package):
 ```bash
-bash scripts/run_2024_synthesis.sh
+RUN_DIR=../d_drive/popsim/runs/<run_name> bash scripts/run_2024_synthesis.sh
 ```
 
 Or directly with PopulationSim:
 ```bash
 populationsim \
-  -c /home/da/RDF2055/d_drive/popsim/runs/2024_synthesis/configs \
-  -d /home/da/RDF2055/d_drive/popsim/runs/2024_synthesis/data \
-  -o /home/da/RDF2055/d_drive/popsim/runs/2024_synthesis/output/$(date +%Y-%m-%d_%H)_one_pass/run
+  -c ../d_drive/popsim/runs/<run_name>/configs \
+  -d ../d_drive/popsim/runs/<run_name>/data \
+  -o ../d_drive/popsim/runs/<run_name>/output/$(date +%Y-%m-%d_%H)_one_pass/run
 ```
 
 One-pass output structure:
@@ -159,13 +191,13 @@ Notes:
 Run the two-pass workflow with household-size balancing between passes.
 
 ```bash
-python scripts/run_two_pass_hhsize.py --run-name 2024_synthesis
+python scripts/run_two_pass_hhsize.py --run-name <run_name>
 ```
 
 Useful options:
 ```bash
-python scripts/run_two_pass_hhsize.py --run-name 2024_synthesis --method legacy
-python scripts/run_two_pass_hhsize.py --run-dir /home/da/RDF2055/d_drive/popsim/runs/2024_synthesis
+python scripts/run_two_pass_hhsize.py --run-name <run_name> --method legacy
+python scripts/run_two_pass_hhsize.py --run-dir ../d_drive/popsim/runs/<run_name>
 ```
 
 Two-pass output structure:
@@ -209,7 +241,7 @@ nohup bash scripts/run_2024_synthesis.sh >/dev/null 2>&1 &
 
 Two-pass:
 ```bash
-nohup python scripts/run_two_pass_hhsize.py --run-name 2024_synthesis >/dev/null 2>&1 &
+nohup python scripts/run_two_pass_hhsize.py --run-name <run_name> >/dev/null 2>&1 &
 ```
 
 Check whether a PID is still running:
@@ -221,12 +253,12 @@ ps -fp <PID>
 Validate a standard run:
 
 ```bash
-python scripts/validate_popsim_run.py --run-name 2024_synthesis --write-csv
+python scripts/validate_popsim_run.py --run-name <run_name> --write-csv
 ```
 
 Validate a two-pass final run:
 ```bash
-python scripts/validate_popsim_run.py --output-dir /home/da/RDF2055/d_drive/popsim/runs/2024_synthesis/output/<YYYY-MM-DD>_<HH>_two_pass/pass2 --configs-dir /home/da/RDF2055/d_drive/popsim/runs/2024_synthesis/configs --write-csv
+python scripts/validate_popsim_run.py --output-dir ../d_drive/popsim/runs/<run_name>/output/<YYYY-MM-DD>_<HH>_two_pass/pass2 --configs-dir ../d_drive/popsim/runs/<run_name>/configs --write-csv
 ```
 
 Validation writes CSV summaries into a `validation/` folder under the target output folder.
@@ -266,6 +298,5 @@ d_drive/popsim/runs/<project_name>_<target_geo_lower>/
 
 Notes:
 - one target geography per run
-- example run folders are `2024_refine_taz` and `2024_refine_mcd`
 - review and edit `data/<project_name>_control_totals_<TARGET_GEO>.csv`, then replace that file in-place before the later refinement/synthesis run
 - `refinement/urbansim_refine_input.ipynb` remains reference material, but `scripts/generate_refinement_inputs.py` is the maintained entrypoint
