@@ -90,6 +90,8 @@ MIN_HH = 20      # tract with fewer ACS households than this: PUMA shares as the
 MIN_POP = 50     # same, for person groups
 MAX_K = 5000.0   # cap on the shrinkage strength (no real BG variation -> tract share)
 MAX_TOP_BIN = 10.0  # the 7+ bin mean the pass-2 balancer allows (7-10)
+MAX_IND_PER_WORKER = 1.3  # ACS industry / EMPWORKER above this: group-quarters tract (region p99 = 1.24)
+MIN_HH_GQ = 100  # group-quarters tract with fewer ACS households: PUMA worker-household shares
 
 # importance changes vs the July 2025 run (target name -> new importance). Age of
 # head and children were lowered in run 1 to give the size refit room; the refit
@@ -159,12 +161,28 @@ def allocate_group(shares, base):
     return out
 
 
+def at_work_by_household():
+    """Number of persons at work (ESR 1 or 4) per seed household id."""
+    p = pd.read_csv(TEMPLATE / "data" / COPY_DATA[1], usecols=["hh_id", "ESR"])
+    return p[p.ESR.isin([1, 4])].groupby("hh_id").size()
+
+
 def workers_2plus_mean_by_puma():
-    """Weighted PUMS mean number of workers in households with 2+ workers, by PUMA."""
-    hh = pd.read_csv(TEMPLATE / "data" / COPY_DATA[0], usecols=["PUMA", "HWORKERS", "WGTP"])
-    w2 = hh[hh.HWORKERS >= 2]
-    m = (w2.HWORKERS * w2.WGTP).groupby(w2.PUMA).sum() / w2.WGTP.groupby(w2.PUMA).sum()
-    return m.reindex(hh.PUMA.unique()).fillna(np.average(w2.HWORKERS, weights=w2.WGTP))
+    """Weighted PUMS mean number of workers at work in households with 2+ of them, by PUMA."""
+    hh = pd.read_csv(TEMPLATE / "data" / COPY_DATA[0], usecols=["PUMA", "hh_id", "WGTP"])
+    hh["w"] = hh.hh_id.map(at_work_by_household()).fillna(0)
+    w2 = hh[hh.w >= 2]
+    m = (w2.w * w2.WGTP).groupby(w2.PUMA).sum() / w2.WGTP.groupby(w2.PUMA).sum()
+    return m.reindex(hh.PUMA.unique()).fillna(np.average(w2.w, weights=w2.WGTP))
+
+
+def employed_per_at_work_by_puma():
+    """Weighted PUMS ratio of employed (ESR 1, 2, 4, 5) to at-work (ESR 1, 4) persons, by PUMA:
+    industry (employed) = EMPWORKER (at work) x this ratio in the fallback tracts."""
+    p = pd.read_csv(TEMPLATE / "data" / COPY_DATA[1], usecols=["PUMA", "ESR", "PWGTP"])
+    emp = (p.PWGTP * p.ESR.isin([1, 2, 4, 5])).groupby(p.PUMA).sum()
+    atw = (p.PWGTP * p.ESR.isin([1, 4])).groupby(p.PUMA).sum()
+    return emp / atw
 
 
 def split_head_age_65(acs, xw):
@@ -288,9 +306,7 @@ def write_seed_households(dst):
     """Copy the seed households with HWORKERS_AT_WORK = persons with ESR 1 or 4 (used
     by the hh_workers controls). HWORKERS (all employed) is kept for the output."""
     h = pd.read_csv(TEMPLATE / "data" / COPY_DATA[0], low_memory=False)
-    p = pd.read_csv(TEMPLATE / "data" / COPY_DATA[1], usecols=["hh_id", "ESR"])
-    n = p[p.ESR.isin([1, 4])].groupby("hh_id").size()
-    h["HWORKERS_AT_WORK"] = h.hh_id.map(n).fillna(0).astype(int)
+    h["HWORKERS_AT_WORK"] = h.hh_id.map(at_work_by_household()).fillna(0).astype(int)
     assert (h.HWORKERS_AT_WORK <= h.HWORKERS).all()
     h.to_csv(dst, index=False)
     print("seed households: HWORKERS_AT_WORK added (differs from HWORKERS in %d records)"
@@ -377,7 +393,10 @@ def main():
     tr = acs_tr.set_index("TRACTID").reindex(tr_new.index).fillna(0)
     tr = tr.join(tr_acs.add_prefix("acs_")).join(xw.drop_duplicates("TRACT").set_index("TRACT").PUMA)
     puma = tr.groupby("PUMA")[WORKER_COLS + INDUSTRY_COLS + ["EMPWORKER", "acs_HHBASE", "acs_POPBASE"]].transform("sum")
-    use_puma_hh = tr.acs_HHBASE < MIN_HH
+    gq_like = tr[INDUSTRY_COLS].sum(axis=1) > MAX_IND_PER_WORKER * tr.EMPWORKER
+    # a group-quarters tract with few ACS households (U-M campus: 65 vs 697 target)
+    # also takes its worker-household shares from the PUMA
+    use_puma_hh = (tr.acs_HHBASE < MIN_HH) | (gq_like & (tr.acs_HHBASE < MIN_HH_GQ))
     use_puma_pop = tr.acs_POPBASE < MIN_POP
     w_src = tr[WORKER_COLS].where(~use_puma_hh, puma[WORKER_COLS])
     w_shares = w_src.div(w_src.sum(axis=1), axis=0).to_numpy()
@@ -390,18 +409,26 @@ def main():
     ind = rates[INDUSTRY_COLS].mul(tr_new.POPBASE, axis=0)
     tout[INDUSTRY_COLS] = np.vstack([largest_remainder(v, round(v.sum())) for v in ind.to_numpy()])
     tout["EMPWORKER"] = (rates.EMPWORKER * tr_new.POPBASE).round().astype(int)
-    # Tracts on PUMA rates: rounding the three groups separately can contradict
-    # (e.g. a 0-worker household with EMPWORKER 1), which makes the integerizer
-    # infeasible. Derive EMPWORKER from the worker households, then industry from
-    # EMPWORKER, so one real household can meet all of them.
+    # Fallback tracts: derive EMPWORKER from the worker households, then industry
+    # from EMPWORKER, so one real household can meet all of them.
+    #  - Tracts on PUMA rates: rounding the three groups separately can contradict
+    #    (e.g. a 0-worker household with EMPWORKER 1) -> integerizer infeasible.
+    #  - Group-quarters tracts (ACS industry > MAX_IND_PER_WORKER x EMPWORKER, e.g.
+    #    campus tracts): ACS person tables count dorm residents but the rate is per
+    #    household person, so industry came out up to 9x EMPWORKER. B08202 counts
+    #    households only. Without this, the balancing added "employed, not at work"
+    #    persons (Washtenaw 3.2x the seed; review 2026-10-13).
     m2 = tr.PUMA.map(workers_2plus_mean_by_puma())
     emp = (tout.HHWORKER1 + m2 * tout.HHWORKER2).round().astype(int)
+    ind_total = (emp * tr.PUMA.map(employed_per_at_work_by_puma())).round().astype(int)
     ind_shares = rate_src[INDUSTRY_COLS].div(rate_src[INDUSTRY_COLS].sum(axis=1), axis=0).fillna(0)
-    for t in tr.index[use_puma_hh | use_puma_pop]:
+    fallback = tr.index[use_puma_hh | use_puma_pop | gq_like]
+    for t in fallback:
         tout.loc[t, "EMPWORKER"] = emp[t]
-        tout.loc[t, INDUSTRY_COLS] = largest_remainder(ind_shares.loc[t].to_numpy() * emp[t], emp[t])
-    print("tracts: %d | worker shares from PUMA: %d | industry rates from PUMA: %d"
-          % (len(tr), int(use_puma_hh[tr_new.HHBASE > 0].sum()), int(use_puma_pop[tr_new.POPBASE > 0].sum())))
+        tout.loc[t, INDUSTRY_COLS] = largest_remainder(ind_shares.loc[t].to_numpy() * ind_total[t], ind_total[t])
+    print("tracts: %d | worker shares from PUMA: %d | industry rates from PUMA: %d | group-quarters tracts: %s"
+          % (len(tr), int(use_puma_hh[tr_new.HHBASE > 0].sum()), int(use_puma_pop[tr_new.POPBASE > 0].sum()),
+             list(tr.index[gq_like & ~(use_puma_hh | use_puma_pop)])))
 
     # ---- checks
     for cols in HH_GROUPS.values():
@@ -410,8 +437,7 @@ def main():
     for cols in POP_GROUPS.values():
         assert (out[cols].sum(axis=1) == out.POPBASE).all()
     assert (tout[WORKER_COLS].sum(axis=1) == tr_new.HHBASE).all()
-    puma_tr = tr.index[use_puma_hh | use_puma_pop]
-    assert (tout.loc[puma_tr, INDUSTRY_COLS].sum(axis=1) == tout.loc[puma_tr, "EMPWORKER"]).all()
+    assert (tout.loc[fallback, INDUSTRY_COLS].sum(axis=1) == ind_total[fallback]).all()
     assert (out.select_dtypes("number") >= 0).all().all() and (tout >= 0).all().all()
     pout = puma_profile_controls(out, tout, xw) if USE_PUMA_PROFILE else None
 

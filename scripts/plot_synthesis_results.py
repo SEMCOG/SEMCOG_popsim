@@ -14,6 +14,9 @@
 #     python scripts/plot_synthesis_results.py --summary-dir .../pass2 --out-dir .../validation/charts \
 #         --label "2025 MCD run" [--compare-dir .../old/pass2 --compare-label "July 2025"] \
 #         [--extra-run .../run1/pass2 "run 1"] [--acs-blkgrp .../SEMCOG_2024_control_totals_blkgrp.csv]
+#         [--final-dir .../final --seed-dir <run folder>/data]
+# With --final-dir, this run's results are counted from the output population (final/),
+# not taken from PopulationSim's summaries (tract summaries report the tract weights).
 
 import argparse
 from pathlib import Path
@@ -260,6 +263,32 @@ def fit_summary_plot(runs, acs, year, path):
     plt.close(fig)
 
 
+def results_from_final(summary, geo, final_dir, controls_csv, seed_dir):
+    """Replace the <target>_result columns with counts from the output population.
+
+    PopulationSim's final_summary_TRACT.csv reports the tract-level integer weights, but
+    the population is expanded from the block-group weights, which have no tract
+    controls; the tract totals of the output differ (run 6: at-work persons -0.35%).
+    The reconciliation step can also change block groups after the summary."""
+    ctl = pd.read_csv(controls_csv)
+    ctl = ctl[(ctl.target + "_result").isin(summary.columns)]  # tract summary also has the BG controls
+    h = pd.read_csv(final_dir / "synthetic_households.csv", usecols=["hh_id", geo])
+    p = pd.read_csv(final_dir / "synthetic_persons.csv", usecols=["hh_id", "per_num", geo])
+    seed_h = pd.read_csv(seed_dir / "SEMCOG_2024_seed_households.csv", low_memory=False)
+    seed_p = pd.read_csv(seed_dir / "SEMCOG_2024_seed_persons.csv", low_memory=False)
+    seed_p = seed_p.rename(columns={"SPORDER": "per_num"}).drop(columns=[geo], errors="ignore")
+    tables = {"households": h.merge(seed_h.drop(columns=[geo], errors="ignore"), on="hh_id", how="left"),
+              "persons": p.merge(seed_p, on=["hh_id", "per_num"], how="left")}
+    out = summary.copy()
+    for _, r in ctl.iterrows():
+        t = tables[r.seed_table]
+        m = np.asarray(pd.eval(r.expression, local_dict={r.seed_table: t}), dtype=bool) \
+            if r.target != "num_hh" else np.ones(len(t), dtype=bool)
+        got = pd.Series(m, index=t.index).groupby(t[geo]).sum()
+        out[r.target + "_result"] = got.reindex(out.index).fillna(0).astype(int).to_numpy()
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description="Charts of PopulationSim results vs controls")
     ap.add_argument("--summary-dir", required=True, type=Path, help="folder with final_summary_<GEO>.csv")
@@ -271,11 +300,18 @@ def main():
     ap.add_argument("--extra-run", nargs=2, action="append", metavar=("DIR", "LABEL"), default=[],
                     help="more runs for fit_summary.png, oldest first, between --compare-dir and this run")
     ap.add_argument("--acs-blkgrp", type=Path, help="raw ACS BG control file; enables fit_summary.png")
+    ap.add_argument("--final-dir", type=Path,
+                    help="final/ folder: count this run's results from the output population; uses "
+                         "<run>/configs/pass2/controls.csv and the seed in --seed-dir")
+    ap.add_argument("--seed-dir", type=Path, help="folder with the run's seed copy (the run folder's data/)")
     args = ap.parse_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
     for geo in GEOS:
         s = pd.read_csv(args.summary_dir / ("final_summary_%s.csv" % geo), index_col="id")
+        if args.final_dir:
+            s = results_from_final(s, geo, args.final_dir,
+                                   args.final_dir.parent / "configs" / "pass2" / "controls.csv", args.seed_dir)
         stats = pct_error_stats(s)
         stats.to_csv(args.out_dir / ("error_summary_%s.csv" % geo))
         panels = []
