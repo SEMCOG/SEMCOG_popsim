@@ -58,6 +58,9 @@ Notes on the controls step:
   columns they need to the run's seed copy (the template seed is not changed).
 - Tracts with large group quarters (for example, campus dorms) get worker and industry controls
   built from household worker counts, because ACS person tables include group-quarters residents.
+- With `SEED_REWEIGHT` (top of `build_controls_mcd_2025.py`), the run's seed copy is reweighted so that
+  employed and unemployed persons by age follow the recent survey years (`RECENT_YEARS`), and the tract worker
+  controls are rebuilt from it. Diagnostics: `data/targets/seed_reweight_by_puma.csv`.
 
 ### Environment (one time)
 OR-Tools, the fast integerizer, does not load in the base conda env (pip `ortools` and conda-forge

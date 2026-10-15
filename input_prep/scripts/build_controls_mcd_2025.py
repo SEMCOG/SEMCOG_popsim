@@ -24,6 +24,9 @@
 #     as the ACS tables do; the seed copy codes the armed forces as industry 14.
 #   - Worker controls count workers at work (ESR 1, 4), as B08014 / B08202 do; the
 #     seed copy adds HWORKERS_AT_WORK for the household worker groups.
+#   - Seed reweighting (SEED_REWEIGHT): household weights calibrated per PUMA to the employed and
+#     unemployed rates by age of the recent survey years (the five-year PUMS includes the COVID labor
+#     market); tract worker controls rebuilt from the reweighted seed, each with its own definition.
 #   - Optional PUMA controls (USE_PUMA_PROFILE): person age inside the BG bands 25-64 and 65+, and
 #     workers by age, at the PUMS seed shares of the PUMA, scaled to the BG / tract
 #     totals of the PUMA. Without them the balancing moved workers to ages 20-34 and
@@ -85,6 +88,15 @@ PUMA_AGE = {
 PUMA_WORKER = {"PWORK16_24": (16, 24), "PWORK25_54": (25, 54), "PWORK55_64": (55, 64), "PWORK65P": (65, 200)}
 PUMA_IMPORTANCE = 1000   # moderate: below the age-of-head, income and size controls
 USE_PUMA_PROFILE = False  # off in run 5: test the industry fix alone first
+# Seed reweighting to recent-year employment: the five-year PUMS includes the COVID labor market of
+# 2020-21. Household weights are calibrated per PUMA so that employed and unemployed persons by age
+# band match the RECENT_YEARS rates, holding persons by age, households by size and by head age; the
+# tract worker controls are then rebuilt from the reweighted seed (reweight_seed, rebuild_worker_controls).
+SEED_REWEIGHT = True
+RECENT_YEARS = ["2022", "2023", "2024"]
+RW_AGE = [(0, 15), (16, 24), (25, 54), (55, 64), (65, 200)]
+RW_EMP = [(16, 24), (25, 54), (55, 64), (65, 200)]
+RW_HEAD = [(15, 24), (25, 44), (45, 64), (65, 74), (75, 200)]
 
 MIN_HH = 20      # tract with fewer ACS households than this: PUMA shares as the prior
 MIN_POP = 50     # same, for person groups
@@ -323,6 +335,146 @@ def write_seed_persons(dst):
     print("seed persons: industry -> 14 for %d armed-forces records" % af.sum())
 
 
+def _rw_incidence(h, p):
+    """Household x constraint matrix (counts) for the seed reweighting."""
+    cols = {}
+    for lo, hi in RW_AGE:
+        cols["persons_%d_%d" % (lo, hi)] = p.AGEP.between(lo, hi)
+    for lo, hi in RW_EMP:
+        cols["employed_%d_%d" % (lo, hi)] = p.AGEP.between(lo, hi) & p.ESR.isin([1, 2, 4, 5])
+        cols["unemployed_%d_%d" % (lo, hi)] = p.AGEP.between(lo, hi) & (p.ESR == 3)
+    A = pd.DataFrame(cols).groupby(p.hh_id).sum().reindex(h.hh_id).fillna(0)
+    for k in range(1, 6):
+        A["size_%d" % k] = (h.NP.clip(upper=5) == k).to_numpy()
+    for lo, hi in RW_HEAD:
+        A["head_%d_%d" % (lo, hi)] = h.AGEHOH.between(lo, hi).to_numpy()
+    return A.astype(float)
+
+
+def _calibrate(w0, A, T, tol=1e-10, max_sweeps=5000):
+    """Minimum-entropy calibration w = w0 * exp(A @ lam) by cyclic dual coordinate ascent:
+    for each constraint k a scalar Newton step on sum_h w_h exp(d a_hk) a_hk = T_k."""
+    w = w0.copy()
+    for sweep in range(max_sweeps):
+        for k in range(A.shape[1]):
+            a = A[:, k]
+            nz = a > 0
+            d = 0.0
+            for _ in range(50):
+                e = w[nz] * np.exp(d * a[nz])
+                f, g = (e * a[nz]).sum() - T[k], (e * a[nz] ** 2).sum()
+                step = f / g
+                d -= step
+                if abs(step) < 1e-14:
+                    break
+            w[nz] *= np.exp(d * a[nz])
+        err = np.max(np.abs(A.T @ w - T) / np.maximum(T, 1))
+        if err < tol:
+            return w, sweep + 1, err
+    return w, max_sweeps, err
+
+
+def reweight_seed(data_dir, diag_out):
+    """Calibrate the seed household weight WGTP per PUMA to the RECENT_YEARS employed and unemployed rates
+    by age band (household weights, as PopulationSim counts persons). Rewrites the seed copies in data_dir;
+    the pooled weight is kept as WGTP_pooled. Record attributes do not change."""
+    h = pd.read_csv(data_dir / COPY_DATA[0], low_memory=False)
+    p = pd.read_csv(data_dir / COPY_DATA[1], low_memory=False)
+    year = p.groupby("hh_id").SERIALNO.first().astype(str).str[:4]
+    h["survey_year"] = h.hh_id.map(year)
+    assert h.survey_year.notna().all()
+    p["hw"] = p.hh_id.map(h.set_index("hh_id").WGTP)
+    p["yr"] = p.hh_id.map(year)
+    mult = pd.Series(1.0, index=h.hh_id)
+    rows = []
+    for puma, hp in h.groupby("PUMA"):
+        pp = p[p.hh_id.isin(hp.hh_id)]
+        A = _rw_incidence(hp, pp)
+        w0 = hp.WGTP.to_numpy(float)
+        T = A.T.to_numpy() @ w0
+        rec = pp.yr.isin(RECENT_YEARS)
+        for lo, hi in RW_EMP:
+            band = pp.AGEP.between(lo, hi)
+            n = T[A.columns.get_loc("persons_%d_%d" % (lo, hi))]
+            rate = (pp.hw * (band & pp.ESR.isin([1, 2, 4, 5]) & rec)).sum() / (pp.hw * (band & rec)).sum()
+            T[A.columns.get_loc("employed_%d_%d" % (lo, hi))] = rate * n
+            u = (pp.hw * (band & (pp.ESR == 3) & rec)).sum() / (pp.hw * (band & rec)).sum()
+            T[A.columns.get_loc("unemployed_%d_%d" % (lo, hi))] = u * n
+        w, sweeps, err = _calibrate(w0, A.to_numpy(), T)
+        mult.loc[hp.hh_id] = w / w0
+        rows.append({"PUMA": puma, "households": len(hp), "sweeps": sweeps, "max_rel_error": err,
+                     "mult_min": (w / w0).min(), "mult_max": (w / w0).max()})
+    diag = pd.DataFrame(rows)
+    assert (diag.max_rel_error < 1e-8).all(), "seed reweighting did not converge"
+    diag.to_csv(diag_out, index=False)
+    h["WGTP_pooled"] = h.WGTP
+    h["WGTP"] = h.WGTP * h.hh_id.map(mult)
+    p["PWGTP"] = p.PWGTP * p.hh_id.map(mult)
+    h.drop(columns=["survey_year"]).to_csv(data_dir / COPY_DATA[0], index=False)
+    p.drop(columns=["hw", "yr"]).to_csv(data_dir / COPY_DATA[1], index=False)
+    m = h.hh_id.map(mult)
+    print("seed reweighted to %s employment: multiplier p1 %.3f, median %.3f, p99 %.3f"
+          % ("-".join(RECENT_YEARS[::len(RECENT_YEARS) - 1]), m.quantile(.01), m.median(), m.quantile(.99)))
+
+
+def _rw_puma_stats(h, p, wcol):
+    """Per PUMA: at-work and civilian employed persons, at-work worker-group shares, m2, employed/at-work."""
+    hw = p.hh_id.map(h.set_index("hh_id")[wcol])
+    g = pd.DataFrame({
+        "atw": hw * p.ESR.isin([1, 4]), "civ": hw * p.ESR.isin([1, 2]),
+        "emp_p": p.PWGTP * p.ESR.isin([1, 2, 4, 5]), "atw_p": p.PWGTP * p.ESR.isin([1, 4])}).groupby(p.PUMA).sum()
+    k = h.HWORKERS_AT_WORK.clip(upper=2)
+    for i in range(3):
+        g["s%d" % i] = (h[wcol] * (k == i)).groupby(h.PUMA).sum()
+    g[["s0", "s1", "s2"]] = g[["s0", "s1", "s2"]].div(g[["s0", "s1", "s2"]].sum(axis=1), axis=0)
+    w2 = h[h.HWORKERS_AT_WORK >= 2]
+    g["m2"] = (w2.HWORKERS_AT_WORK * w2[wcol]).groupby(w2.PUMA).sum() / w2[wcol].groupby(w2.PUMA).sum()
+    g["emp_per_atw"] = g.emp_p / g.atw_p
+    return g
+
+
+def rebuild_worker_controls(data_dir, fallback):
+    """Rebuild the tract worker controls from the reweighted seed, each with its own definition:
+    EMPWORKER (at work) x PUMA at-work ratio; HHWORKER0-2 tract shares x PUMA share ratio, renormalized;
+    INDUSTRY1-13 (civilian employed) x PUMA ratio, INDUSTRY14 unchanged. Fallback tracts are rebuilt with
+    the fallback formula and reweighted PUMA values. Ratios = reweighted / pooled seed."""
+    workers, civ = WORKER_COLS, ["INDUSTRY%d" % i for i in range(1, 14)]
+    h = pd.read_csv(data_dir / COPY_DATA[0], low_memory=False)
+    p = pd.read_csv(data_dir / COPY_DATA[1], usecols=["hh_id", "PUMA", "ESR", "PWGTP"])
+    p0 = p.copy()
+    p0["PWGTP"] = p.PWGTP / p.hh_id.map(h.set_index("hh_id").eval("WGTP / WGTP_pooled"))
+    old, new = _rw_puma_stats(h, p0, "WGTP_pooled"), _rw_puma_stats(h, p, "WGTP")
+    xw = pd.read_csv(data_dir / COPY_DATA[2], dtype={"TRACTID": str})
+    t = pd.read_csv(TRACT_OUT, dtype={"TRACTID": str}).set_index("TRACTID")
+    puma = t.index.map(xw.drop_duplicates("TRACTID").set_index("TRACTID").PUMA)
+    out = t.copy()
+    hh = t[workers].sum(axis=1).to_numpy()
+    share_ratio = (new[["s0", "s1", "s2"]] / old[["s0", "s1", "s2"]]).loc[puma].to_numpy()
+    shares = t[workers].to_numpy() / np.maximum(hh, 1)[:, None] * share_ratio
+    shares = shares / np.maximum(shares.sum(axis=1), 1e-12)[:, None]
+    out[workers] = allocate_group(shares, hh)
+    r_atw = (new.atw / old.atw).loc[puma].to_numpy()
+    r_civ = (new.civ / old.civ).loc[puma].to_numpy()
+    out["EMPWORKER"] = np.round(t.EMPWORKER.to_numpy() * r_atw).astype(int)
+    civ_total = np.round(t[civ].sum(axis=1).to_numpy() * r_civ).astype(int)
+    civ_shares = t[civ].div(t[civ].sum(axis=1).replace(0, 1), axis=0).to_numpy()
+    out[civ] = np.vstack([largest_remainder(s * n, n) for s, n in zip(civ_shares, civ_total)])
+    ind_shares = t[INDUSTRY_COLS].div(t[INDUSTRY_COLS].sum(axis=1).replace(0, 1), axis=0)
+    for x in [x for x in t.index if x in fallback]:
+        pu = puma[t.index.get_loc(x)]
+        emp = int(round(out.at[x, "HHWORKER1"] + new.at[pu, "m2"] * out.at[x, "HHWORKER2"]))
+        tot = int(round(emp * new.at[pu, "emp_per_atw"]))
+        out.at[x, "EMPWORKER"] = emp
+        out.loc[x, INDUSTRY_COLS] = largest_remainder(ind_shares.loc[x].to_numpy() * tot, tot)
+    assert (out[workers].sum(axis=1) == t[workers].sum(axis=1)).all()
+    assert (out.select_dtypes("number") >= 0).all().all()
+    same = [c for c in t.columns if c not in workers + ["EMPWORKER"] + INDUSTRY_COLS]
+    assert (out[same] == t[same]).all().all()
+    out.reset_index()[t.reset_index().columns].to_csv(TRACT_OUT, index=False)
+    print("worker controls rebuilt from the reweighted seed: EMPWORKER %d -> %d, industry %d -> %d"
+          % (t.EMPWORKER.sum(), out.EMPWORKER.sum(), t[INDUSTRY_COLS].sum().sum(), out[INDUSTRY_COLS].sum().sum()))
+
+
 def top_bin_mean_by_puma():
     """Weighted PUMS mean size of 7+ person households, by PUMA."""
     hh = pd.read_csv(TEMPLATE / "data" / COPY_DATA[0], usecols=["PUMA", "NP", "WGTP"])
@@ -460,6 +612,9 @@ def main():
             write_seed_persons(RUN_DIR / "data" / f)
         else:
             shutil.copy2(TEMPLATE / "data" / f, RUN_DIR / "data" / f)
+    if SEED_REWEIGHT:
+        reweight_seed(RUN_DIR / "data", RUN_DIR / "data" / "targets" / "seed_reweight_by_puma.csv")
+        rebuild_worker_controls(RUN_DIR / "data", set(fallback))
     # OR-Tools integerizer: ~50-90x faster than CVXPY/GLPK with the same quality, and
     # GLPK has no working time limit. Needs the isolated popsim conda env (in the
     # base env, ortools + conda pyarrow segfault).
