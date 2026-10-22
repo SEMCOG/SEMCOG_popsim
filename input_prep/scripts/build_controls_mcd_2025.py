@@ -36,6 +36,7 @@
 # Usage:
 #     python input_prep/scripts/build_controls_mcd_2025.py
 
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -49,7 +50,8 @@ from hh_size_balancer import rebalance_household_sizes_shape_preserving  # noqa:
 # ---------------------------------------------------------------- paths
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RUNS = REPO_ROOT.parent / "d_drive" / "popsim" / "runs"
-RUN_DIR = RUNS / "2025_synthesis_mcd"
+# SYNTH_RUN_DIR: a pilot run folder (its data/targets/ needs bg_targets_2025.csv)
+RUN_DIR = Path(os.environ.get("SYNTH_RUN_DIR") or RUNS / "2025_synthesis_mcd")
 TARGETS = RUN_DIR / "data" / "targets" / "bg_targets_2025.csv"
 ACS_DIR = RUNS / "2024_synthesis" / "data"          # unadjusted ACS 2020-2024 controls
 ACS_B25007 = REPO_ROOT.parent / "d_drive" / "popsim" / "inputs" / "acs_2024_bg" / "acs2024_5yr_B25007_bg.csv"
@@ -97,6 +99,22 @@ RECENT_YEARS = ["2022", "2023", "2024"]
 RW_AGE = [(0, 15), (16, 24), (25, 54), (55, 64), (65, 200)]
 RW_EMP = [(16, 24), (25, 54), (55, 64), (65, 200)]
 RW_HEAD = [(15, 24), (25, 44), (45, 64), (65, 74), (75, 200)]
+
+# Age controls aged to 2025 (run 9, pilot A2 of 2026-10-21). The seed and the ACS age shares
+# describe about 2022, and the region aged fast in 2022-25. Targets by large area x band from
+# age_targets_2025.py (RSQE 2025 - GQ by age; needs data/targets/age_targets_2025.csv). The BG
+# person bands are raked to them per large area; finer bands go to PUMA controls built from the
+# BG pieces (PUMAs cross large areas), with 75+ split into 75-84 and 85+ (one 75+ band kept the
+# seed's 2020-like split: 85+ +22%); head-age bands are scaled by target / current persons at the
+# same ages. Pilots A (one 75+ band) and B (A2 + seed reweighted to the 2025 ages: same ages,
+# 8,400 fewer employed) were not adopted.
+AGE_2025 = True
+AGE_TARGETS = RUN_DIR / "data" / "targets" / "age_targets_2025.csv"
+AGE_BROAD = {"AGEP1": ["0_17"], "AGEP2": ["18_24"], "AGEP3": ["25_34", "35_54", "55_64"],
+             "AGEP4": ["65_74", "75_84", "85_plus"]}
+AGE_FINE = {"25_34": (25, 34), "35_54": (35, 54), "55_64": (55, 64), "65_74": (65, 74),
+            "75_84": (75, 84), "85_plus": (85, 200)}
+HEAD_BAND = {"HHAGE1": "15_24", "HHAGE2": "25_44", "HHAGE3": "45_64", "HHAGE4": "65_74", "HHAGE5": "75_plus"}
 
 MIN_HH = 20      # tract with fewer ACS households than this: PUMA shares as the prior
 MIN_POP = 50     # same, for person groups
@@ -264,6 +282,68 @@ def puma_profile_controls(out, tout, xw):
     assert (res.PWORK55_64 <= res.PAGE55_64).all()
     assert (res.PWORK65P <= res.PAGE65_69 + res.PAGE70_74 + res.PAGE75P).all()
     return res
+
+
+def rake(prior, rows, cols, iters=500, tol=1e-9):
+    """Scale a non-negative matrix to the row and column totals (cols rescaled to sum(rows))."""
+    m = np.asarray(prior, dtype=float).copy()
+    rows = np.asarray(rows, dtype=float)
+    cols = np.asarray(cols, dtype=float) * rows.sum() / max(float(np.sum(cols)), 1e-12)
+    for _ in range(iters):
+        m *= np.divide(rows, m.sum(axis=1), out=np.zeros_like(rows), where=m.sum(axis=1) > 0)[:, None]
+        m *= np.divide(cols, m.sum(axis=0), out=np.zeros_like(cols), where=m.sum(axis=0) > 0)[None, :]
+        if np.abs(m.sum(axis=1) - rows).max() < tol * max(rows.max(), 1):
+            break
+    return m
+
+
+def age_controls_2025(out, bg_la, xw):
+    """Rake the BG person-age and head-age controls to the 2025 targets per large area, and
+    build the PUMA controls for the finer bands from the BG pieces. Changes `out` in place;
+    returns the PUMA control table."""
+    t = pd.read_csv(AGE_TARGETS).set_index(["large_area_id", "band"])
+    tgt, cur = t.target_hh.unstack(), t.current_hh.unstack()
+    p = pd.read_csv(TEMPLATE / "data" / COPY_DATA[1], usecols=["PUMA", "AGEP", "PWGTP"])
+    bg_puma = xw.set_index("BLKGRPID").PUMA.loc[out.index]
+    agep, hhage = POP_GROUPS["AGEP"], HH_GROUPS["HHAGE"]
+    fine = pd.DataFrame(0.0, index=out.index, columns=list(AGE_FINE))
+    for la, idx in out.groupby(bg_la.loc[out.index]).groups.items():
+        sub = out.loc[idx]
+        # person bands: rake to the large area's targets, BG totals fixed
+        cols = [tgt.loc[la, AGE_BROAD[c]].sum() for c in agep]
+        m = rake(sub[agep], sub.POPBASE, cols)
+        out.loc[idx, agep] = allocate_group(m / np.maximum(m.sum(axis=1, keepdims=True), 1e-12), sub.POPBASE.to_numpy())
+        # head age: scale by target / current persons at the same ages (constant headship)
+        f = np.array([tgt.at[la, HEAD_BAND[c]] / cur.at[la, HEAD_BAND[c]] for c in hhage])
+        prior = sub[hhage].to_numpy() * f
+        m = rake(prior, sub.HHBASE, prior.sum(axis=0))
+        out.loc[idx, hhage] = allocate_group(m / np.maximum(m.sum(axis=1, keepdims=True), 1e-12), sub.HHBASE.to_numpy())
+        # finer bands: PUMA seed shares inside the BG broad band, raked to the large area
+        for broad in ("AGEP3", "AGEP4"):
+            bands = AGE_BROAD[broad]
+            seed = pd.DataFrame({b: p.PWGTP.where(p.AGEP.between(*AGE_FINE[b]), 0).groupby(p.PUMA).sum() for b in bands})
+            shares = seed.div(seed.sum(axis=1), axis=0).reindex(bg_puma.loc[idx]).to_numpy()
+            prior = shares * out.loc[idx, broad].to_numpy()[:, None]
+            fine.loc[idx, bands] = rake(prior, out.loc[idx, broad], tgt.loc[la, bands].to_numpy())
+    res = fine.groupby(bg_puma).sum()
+    pout = pd.DataFrame(index=res.index.rename("PUMA"))
+    for broad in ("AGEP3", "AGEP4"):
+        bands = AGE_BROAD[broad]
+        total = out[broad].groupby(bg_puma).sum().loc[res.index].to_numpy()
+        pout[["PAGE" + b.upper() for b in bands]] = allocate_group(
+            res[bands].div(res[bands].sum(axis=1), axis=0).fillna(0).to_numpy(), total)
+        assert (pout[["PAGE" + b.upper() for b in bands]].sum(axis=1).to_numpy() == total).all()
+    return pout
+
+
+def age_puma_control_rows():
+    """controls.csv rows for the 2025 PUMA age controls."""
+    rows = []
+    for b, (lo, hi) in AGE_FINE.items():
+        age = "(persons.AGEP >= %d)" % lo + ("" if hi >= 200 else " & (persons.AGEP <= %d)" % hi)
+        rows.append({"target": "persons_age_" + b, "geography": "PUMA", "seed_table": "persons",
+                     "importance": PUMA_IMPORTANCE, "control_field": "PAGE" + b.upper(), "expression": age})
+    return pd.DataFrame(rows)
 
 
 def puma_control_rows():
@@ -508,6 +588,11 @@ def main():
         shares, level, k_by_group[name] = share_table(acs, xw, cols, "POPBASE", MIN_POP)
         out[cols] = allocate_group(shares.loc[out.index].to_numpy(), pop)
     diag["pop_share_level"] = level.loc[out.index]
+    age_pout = None
+    if AGE_2025:
+        assert not USE_PUMA_PROFILE, "AGE_2025 and USE_PUMA_PROFILE both write PUMA controls"
+        from age_targets_2025 import bg_large_area
+        age_pout = age_controls_2025(out, bg_large_area(TARGETS).large_area_id, xw)
 
     # ---- household size: tilt to POPBASE, flag what cannot be met
     shares, _, k_by_group["HHPERSONS"] = share_table(acs, xw, SIZE_COLS, "HHBASE", MIN_HH)
@@ -591,7 +676,7 @@ def main():
     assert (tout[WORKER_COLS].sum(axis=1) == tr_new.HHBASE).all()
     assert (tout.loc[fallback, INDUSTRY_COLS].sum(axis=1) == ind_total[fallback]).all()
     assert (out.select_dtypes("number") >= 0).all().all() and (tout >= 0).all().all()
-    pout = puma_profile_controls(out, tout, xw) if USE_PUMA_PROFILE else None
+    pout = puma_profile_controls(out, tout, xw) if USE_PUMA_PROFILE else age_pout
 
     # ---- write the run package
     (RUN_DIR / "configs").mkdir(parents=True, exist_ok=True)
@@ -600,7 +685,7 @@ def main():
     out.reset_index()[col_order].to_csv(BLKGRP_OUT, index=False)
     tcols = [c for c in acs_tr.columns if c != "TRACTID"]
     tout[tcols].rename_axis("TRACTID").reset_index()[tcols + ["TRACTID"]].to_csv(TRACT_OUT, index=False)
-    if USE_PUMA_PROFILE:
+    if pout is not None:
         pout.reset_index().to_csv(PUMA_OUT, index=False)
     else:
         PUMA_OUT.unlink(missing_ok=True)
@@ -621,7 +706,7 @@ def main():
     settings = (TEMPLATE / "configs" / "settings.yaml").read_text()
     assert "USE_CVXPY: true\n" in settings, "template settings changed: check USE_CVXPY"
     settings = settings.replace("USE_CVXPY: true\n", "USE_CVXPY: false  # OR-Tools; run in the popsim conda env\n")
-    if USE_PUMA_PROFILE:
+    if pout is not None:
         tract_entry = "  tablename: TRACT_control_data\n"
         assert settings.count(tract_entry) == 1, "template settings changed: check TRACT_control_data"
         settings = settings.replace(tract_entry, tract_entry + "- filename: %s\n  tablename: PUMA_control_data\n"
@@ -634,6 +719,8 @@ def main():
     ctl["importance"] = ctl.target.map(IMPORTANCE).fillna(ctl.importance).astype(int)
     if USE_PUMA_PROFILE:
         ctl = pd.concat([ctl, puma_control_rows()], ignore_index=True)
+    elif AGE_2025:
+        ctl = pd.concat([ctl, age_puma_control_rows()], ignore_index=True)
     ctl.to_csv(RUN_DIR / "configs" / "controls.csv", index=False)
 
     # ---- report

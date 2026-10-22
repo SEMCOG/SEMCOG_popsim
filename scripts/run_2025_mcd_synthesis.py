@@ -25,7 +25,8 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-RUN_DIR = REPO.parent / "d_drive" / "popsim" / "runs" / "2025_synthesis_mcd"
+# SYNTH_RUN_DIR: a pilot run folder (also read by build_controls_mcd_2025.py)
+RUN_DIR = Path(os.environ.get("SYNTH_RUN_DIR") or REPO.parent / "d_drive" / "popsim" / "runs" / "2025_synthesis_mcd")
 ACS_B25002 = REPO.parent / "d_drive" / "popsim" / "inputs" / "acs_2024_bg" / "acs2024_5yr_B25002_bg.csv"
 STEPS = ["targets", "controls", "synthesis", "reconcile"]
 
@@ -69,6 +70,10 @@ def main():
             sys.exit("missing %s\nrun: CENSUS_API_KEY=... python input_prep/scripts/fetch_acs_b25002_bg.py" % ACS_B25002)
         run([py, "input_prep/scripts/adjust_to_mcd_2025.py", "--estimate", args.estimate, "--base-hdf", args.base_hdf], env)
     if "controls" in steps:
+        if not (RUN_DIR / "data" / "targets" / "age_targets_2025.csv").exists():
+            sys.exit("missing %s\nrun: python input_prep/scripts/age_targets_2025.py --gq <GQ persons csv> "
+                     "--final <synthesis final/ of the previous run> --out %s"
+                     % (RUN_DIR / "data" / "targets" / "age_targets_2025.csv", RUN_DIR / "data" / "targets"))
         run([py, "input_prep/scripts/build_controls_mcd_2025.py"], env)
     if "synthesis" in steps:
         check_env()
